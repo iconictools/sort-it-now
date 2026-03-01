@@ -25,13 +25,21 @@ def _setup_logging(verbose: bool) -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    # Console handler
-    console = logging.StreamHandler(sys.stderr)
+    # Console handler — use UTF-8 with replacement to avoid
+    # UnicodeEncodeError on Windows (cp1252 default).
+    console_stream = open(  # noqa: SIM115
+        sys.stderr.fileno(),
+        mode="w",
+        encoding="utf-8",
+        errors="replace",
+        closefd=False,
+    )
+    console = logging.StreamHandler(console_stream)
     console.setLevel(level)
     console.setFormatter(logging.Formatter(fmt))
     root_logger.addHandler(console)
 
-    # Rotating file handler — always active
+    # Rotating file handler -- always active
     os.makedirs(DEFAULT_CONFIG_DIR, exist_ok=True)
     file_handler = logging.handlers.RotatingFileHandler(
         DEFAULT_LOG_FILE,

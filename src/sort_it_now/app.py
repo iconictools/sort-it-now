@@ -58,7 +58,7 @@ class App:
             wizard = SetupWizard()
             folders = wizard.run()
             if not folders:
-                logger.info("No folders configured — exiting.")
+                logger.info("No folders configured -- exiting.")
                 return
             for folder, dests in folders.items():
                 self.config.add_monitored_folder(folder, dests)
@@ -94,7 +94,7 @@ class App:
             self.history.close()
 
     def _quit(self) -> None:
-        logger.info("Shutting down…")
+        logger.info("Shutting down...")
         self.watcher.stop()
         self.history.close()
 
@@ -158,7 +158,7 @@ class App:
             _, ext = os.path.splitext(filepath)
             if ext:
                 self.rules.set_rule(ext, destination)
-                logger.info("Auto-rule created: %s → %s", ext, destination)
+                logger.info("Auto-rule created: %s -> %s", ext, destination)
 
     # ------------------------------------------------------------------
     # File operations
@@ -184,9 +184,9 @@ class App:
             self.watcher.mark_self_moved(dst)
             shutil.move(src, dst)
             self.history.record(src, dst)
-            logger.info("Moved %s → %s", src, dst)
+            logger.info("Moved %s -> %s", src, dst)
         except (OSError, shutil.Error) as exc:
-            logger.error("Failed to move %s → %s: %s", src, dest_dir, exc)
+            logger.error("Failed to move %s -> %s: %s", src, dest_dir, exc)
             try:
                 fallback = DEFAULT_UNSORTED_DIR
                 os.makedirs(fallback, exist_ok=True)
@@ -202,7 +202,7 @@ class App:
                 self.watcher.mark_self_moved(fb_dst)
                 shutil.move(src, fb_dst)
                 self.history.record(src, fb_dst)
-                logger.warning("Fallback: moved %s → %s", src, fb_dst)
+                logger.warning("Fallback: moved %s -> %s", src, fb_dst)
             except (OSError, shutil.Error) as fb_exc:
                 logger.error(
                     "Fallback move also failed for %s: %s", src, fb_exc
@@ -224,7 +224,7 @@ class App:
         if result:
             # Mark the restored path so the watcher ignores it
             self.watcher.mark_self_moved(result[1])
-            logger.info("Undone: %s → %s", *result)
+            logger.info("Undone: %s -> %s", *result)
         else:
             logger.info("Nothing to undo.")
 
