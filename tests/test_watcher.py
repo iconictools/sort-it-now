@@ -1,9 +1,5 @@
 """Tests for the watcher module (unit-level, no I/O waiting)."""
 
-import os
-import tempfile
-import time
-import threading
 
 from sort_it_now.classifier import is_temp_file, matches_ignore_pattern
 

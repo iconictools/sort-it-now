@@ -5,11 +5,16 @@ files the user has previously classified.
 """
 
 import json
+import logging
 import os
+import shutil
+import time
 from collections import Counter
 from typing import Any
 
 from sort_it_now.constants import DEFAULT_RULES_FILE
+
+logger = logging.getLogger(__name__)
 
 
 class Rules:
@@ -26,8 +31,20 @@ class Rules:
 
     def load(self) -> None:
         if os.path.exists(self.path):
-            with open(self.path, "r", encoding="utf-8") as fh:
-                self._data = json.load(fh)
+            try:
+                with open(self.path, "r", encoding="utf-8") as fh:
+                    self._data = json.load(fh)
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.warning(
+                    "Rules file corrupted (%s) — backing up and resetting.",
+                    exc,
+                )
+                backup = f"{self.path}.bak.{int(time.time())}"
+                try:
+                    shutil.copy2(self.path, backup)
+                except OSError:
+                    pass
+                self._data = {"extension_map": {}, "history": []}
         else:
             self._data = {"extension_map": {}, "history": []}
 
@@ -45,11 +62,14 @@ class Rules:
         """Return ``{".ext": "Destination"}`` mapping."""
         return self._data.get("extension_map", {})
 
-    def record_action(self, filepath: str, destination: str) -> None:
+    def record_action(
+        self, filepath: str, destination: str, threshold: int = 3
+    ) -> None:
         """Record that the user sent *filepath* to *destination*.
 
         After enough consistent decisions for the same extension,
-        this creates an automatic rule.
+        this creates an automatic rule.  The *threshold* can be
+        configured (default 3).
         """
         _, ext = os.path.splitext(filepath)
         ext_lower = ext.lower()
@@ -60,7 +80,7 @@ class Rules:
             {"ext": ext_lower, "destination": destination}
         )
 
-        # Auto-learn after 3 consistent choices
+        # Auto-learn after *threshold* consistent choices
         counts = Counter(
             entry["destination"]
             for entry in self._data["history"]
@@ -68,7 +88,7 @@ class Rules:
         )
         if counts:
             most_common_dest, count = counts.most_common(1)[0]
-            if count >= 3:
+            if count >= threshold:
                 self._data["extension_map"][ext_lower] = most_common_dest
 
         self.save()

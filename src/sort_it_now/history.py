@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 import time
 
-from sort_it_now.constants import DEFAULT_HISTORY_DB
+from sort_it_now.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS actions (
@@ -39,7 +39,19 @@ class History:
             (time.time(), src_path, dst_path),
         )
         self._conn.commit()
+        self._prune()
         return cur.lastrowid  # type: ignore[return-value]
+
+    def _prune(self) -> None:
+        """Delete oldest rows when the table exceeds HISTORY_MAX_ACTIONS."""
+        count = self._conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]
+        if count > HISTORY_MAX_ACTIONS:
+            self._conn.execute(
+                "DELETE FROM actions WHERE id IN "
+                "(SELECT id FROM actions ORDER BY id ASC LIMIT ?)",
+                (count - HISTORY_MAX_ACTIONS,),
+            )
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Undo

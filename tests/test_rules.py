@@ -1,6 +1,5 @@
 """Tests for the rules module."""
 
-import json
 import os
 import tempfile
 
@@ -13,9 +12,8 @@ class TestRules:
         self._path = os.path.join(self._tmpdir, "test_rules.json")
 
     def teardown_method(self):
-        if os.path.exists(self._path):
-            os.remove(self._path)
-        os.rmdir(self._tmpdir)
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_empty_by_default(self):
         rules = Rules(self._path)
@@ -68,3 +66,26 @@ class TestRules:
         rules = Rules(self._path)
         rules.set_rule("PDF", "/docs")
         assert ".pdf" in rules.extension_map
+
+    def test_auto_learn_custom_threshold(self):
+        """Auto-learn should respect configurable threshold (Q5.1)."""
+        rules = Rules(self._path)
+        rules.record_action("a.csv", "/data", threshold=5)
+        rules.record_action("b.csv", "/data", threshold=5)
+        rules.record_action("c.csv", "/data", threshold=5)
+        assert ".csv" not in rules.extension_map  # 3 < 5
+        rules.record_action("d.csv", "/data", threshold=5)
+        rules.record_action("e.csv", "/data", threshold=5)
+        assert rules.extension_map[".csv"] == "/data"  # 5 >= 5
+
+    def test_corrupt_json_resets(self):
+        """Corrupted rules file should be backed up and reset."""
+        with open(self._path, "w") as f:
+            f.write("NOT VALID JSON {{{")
+        rules = Rules(self._path)
+        assert rules.extension_map == {}
+        # A backup should exist
+        backups = [
+            f for f in os.listdir(self._tmpdir) if "bak" in f
+        ]
+        assert len(backups) >= 1

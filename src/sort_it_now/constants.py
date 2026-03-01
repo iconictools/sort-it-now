@@ -120,3 +120,8 @@ DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".sort-it-now")
 DEFAULT_CONFIG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
 DEFAULT_HISTORY_DB = os.path.join(DEFAULT_CONFIG_DIR, "history.db")
 DEFAULT_RULES_FILE = os.path.join(DEFAULT_CONFIG_DIR, "rules.json")
+DEFAULT_LOG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "sort-it-now.log")
+DEFAULT_UNSORTED_DIR = os.path.join(DEFAULT_CONFIG_DIR, "unsorted")
+
+# Maximum number of actions to keep in history
+HISTORY_MAX_ACTIONS = 1000

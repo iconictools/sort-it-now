@@ -1,6 +1,5 @@
 """Tests for the classifier module."""
 
-import os
 
 from sort_it_now.classifier import (
     classify_by_extension,

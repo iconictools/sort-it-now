@@ -4,10 +4,15 @@ Stores monitored folders, destination sets, and user preferences as JSON.
 """
 
 import json
+import logging
 import os
+import shutil
+import time
 from typing import Any
 
-from sort_it_now.constants import DEFAULT_CONFIG_DIR, DEFAULT_CONFIG_FILE
+from sort_it_now.constants import DEFAULT_CONFIG_FILE
+
+logger = logging.getLogger(__name__)
 
 # Default configuration template
 _DEFAULT_CONFIG: dict[str, Any] = {
@@ -17,6 +22,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "snooze_minutes": 0,
         "batch_mode": False,
         "auto_learn": True,
+        "auto_learn_threshold": 3,
         "prompt_delay_seconds": 3.0,
     },
     "ignore_patterns": [
@@ -42,10 +48,28 @@ class Config:
     # ------------------------------------------------------------------
 
     def load(self) -> None:
-        """Load configuration from disk, creating defaults if missing."""
+        """Load configuration from disk, creating defaults if missing.
+
+        If the file exists but contains invalid JSON, back it up and
+        reset to defaults.
+        """
         if os.path.exists(self.path):
-            with open(self.path, "r", encoding="utf-8") as fh:
-                self._data = json.load(fh)
+            try:
+                with open(self.path, "r", encoding="utf-8") as fh:
+                    self._data = json.load(fh)
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.warning(
+                    "Config file corrupted (%s) — backing up and resetting.",
+                    exc,
+                )
+                backup = f"{self.path}.bak.{int(time.time())}"
+                try:
+                    shutil.copy2(self.path, backup)
+                    logger.info("Backup saved to %s", backup)
+                except OSError:
+                    pass
+                self._data = json.loads(json.dumps(_DEFAULT_CONFIG))
+                self.save()
         else:
             self._data = json.loads(json.dumps(_DEFAULT_CONFIG))
             self.save()

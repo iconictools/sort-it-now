@@ -4,10 +4,10 @@ import logging
 import os
 import shutil
 import threading
-from typing import Any
 
 from sort_it_now.classifier import suggest_destinations
 from sort_it_now.config import Config
+from sort_it_now.constants import DEFAULT_UNSORTED_DIR
 from sort_it_now.history import History
 from sort_it_now.prompt import SortPrompt, SetupWizard
 from sort_it_now.rules import Rules
@@ -61,9 +61,26 @@ class App:
             for folder, dests in folders.items():
                 self.config.add_monitored_folder(folder, dests)
 
+        # Validate monitored folders exist before starting
+        missing: list[str] = []
+        for folder in list(self.config.monitored_folders):
+            if not os.path.isdir(folder):
+                logger.warning("Monitored folder does not exist: %s", folder)
+                missing.append(folder)
+
+        if missing:
+            logger.warning(
+                "Missing monitored folders: %s — they will be skipped.",
+                ", ".join(missing),
+            )
+
         # Start watching configured folders
         for folder in self.config.monitored_folders:
-            self.watcher.add_folder(folder)
+            if folder not in missing:
+                try:
+                    self.watcher.add_folder(folder)
+                except Exception as exc:
+                    logger.error("Cannot watch %s: %s", folder, exc)
         self.watcher.start()
 
         logger.info("Sort It Now is running.")
@@ -132,7 +149,8 @@ class App:
             return
 
         self._move_file(filepath, destination)
-        self.rules.record_action(filepath, destination)
+        threshold = self.config.get_setting("auto_learn_threshold", 3)
+        self.rules.record_action(filepath, destination, threshold=threshold)
 
         if always:
             _, ext = os.path.splitext(filepath)
@@ -145,22 +163,48 @@ class App:
     # ------------------------------------------------------------------
 
     def _move_file(self, src: str, dest_dir: str) -> None:
-        """Move *src* into *dest_dir*, recording the action."""
-        os.makedirs(dest_dir, exist_ok=True)
-        dst = os.path.join(dest_dir, os.path.basename(src))
+        """Move *src* into *dest_dir*, recording the action.
 
-        # Avoid overwriting
-        if os.path.exists(dst):
-            base, ext = os.path.splitext(os.path.basename(src))
-            counter = 1
-            while os.path.exists(dst):
-                dst = os.path.join(dest_dir, f"{base} ({counter}){ext}")
-                counter += 1
+        On failure, falls back to an "unsorted" folder so files are never lost.
+        """
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+            dst = os.path.join(dest_dir, os.path.basename(src))
 
-        self.watcher.mark_self_moved(dst)
-        shutil.move(src, dst)
-        self.history.record(src, dst)
-        logger.info("Moved %s → %s", src, dst)
+            # Avoid overwriting
+            if os.path.exists(dst):
+                base, ext = os.path.splitext(os.path.basename(src))
+                counter = 1
+                while os.path.exists(dst):
+                    dst = os.path.join(dest_dir, f"{base} ({counter}){ext}")
+                    counter += 1
+
+            self.watcher.mark_self_moved(dst)
+            shutil.move(src, dst)
+            self.history.record(src, dst)
+            logger.info("Moved %s → %s", src, dst)
+        except (OSError, shutil.Error) as exc:
+            logger.error("Failed to move %s → %s: %s", src, dest_dir, exc)
+            try:
+                fallback = DEFAULT_UNSORTED_DIR
+                os.makedirs(fallback, exist_ok=True)
+                fb_dst = os.path.join(fallback, os.path.basename(src))
+                if os.path.exists(fb_dst):
+                    base, ext = os.path.splitext(os.path.basename(src))
+                    counter = 1
+                    while os.path.exists(fb_dst):
+                        fb_dst = os.path.join(
+                            fallback, f"{base} ({counter}){ext}"
+                        )
+                        counter += 1
+                self.watcher.mark_self_moved(fb_dst)
+                shutil.move(src, fb_dst)
+                self.history.record(src, fb_dst)
+                logger.warning("Fallback: moved %s → %s", src, fb_dst)
+            except (OSError, shutil.Error) as fb_exc:
+                logger.error(
+                    "Fallback move also failed for %s: %s", src, fb_exc
+                )
 
     # ------------------------------------------------------------------
     # Tray menu actions

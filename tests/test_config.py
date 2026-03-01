@@ -1,6 +1,5 @@
 """Tests for the config module."""
 
-import json
 import os
 import tempfile
 
@@ -13,9 +12,8 @@ class TestConfig:
         self._path = os.path.join(self._tmpdir, "test_config.json")
 
     def teardown_method(self):
-        if os.path.exists(self._path):
-            os.remove(self._path)
-        os.rmdir(self._tmpdir)
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_creates_default_on_missing(self):
         cfg = Config(self._path)
@@ -60,3 +58,17 @@ class TestConfig:
     def test_get_setting_default(self):
         cfg = Config(self._path)
         assert cfg.get_setting("nonexistent", 42) == 42
+
+    def test_corrupt_json_resets_to_default(self):
+        """Config with invalid JSON should back up and reset (Q8.2)."""
+        with open(self._path, "w") as f:
+            f.write("{invalid json!!!")
+        cfg = Config(self._path)
+        assert cfg.monitored_folders == {}
+        # Backup file should exist
+        assert any("bak" in f for f in os.listdir(self._tmpdir))
+
+    def test_auto_learn_threshold_default(self):
+        """Default auto-learn threshold should be 3 (Q5.1)."""
+        cfg = Config(self._path)
+        assert cfg.get_setting("auto_learn_threshold", 3) == 3

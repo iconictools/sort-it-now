@@ -1,7 +1,6 @@
 """System tray icon for Sort It Now (pystray-based)."""
 
 import logging
-import os
 import threading
 from typing import Callable
 

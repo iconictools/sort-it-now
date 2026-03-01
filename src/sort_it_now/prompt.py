@@ -2,10 +2,8 @@
 
 import logging
 import os
-import shutil
-import threading
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -51,12 +49,24 @@ class SortPrompt:
         root.resizable(False, False)
 
         # Center on screen
-        w, h = 420, 360
+        w, h = 420, 420
         sx = root.winfo_screenwidth() // 2 - w // 2
         sy = root.winfo_screenheight() // 2 - h // 2
         root.geometry(f"{w}x{h}+{sx}+{sy}")
 
         basename = os.path.basename(self._filepath)
+
+        # File size
+        try:
+            size_bytes = os.path.getsize(self._filepath)
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.1f} KB"
+            else:
+                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+        except OSError:
+            size_str = ""
 
         # Header
         tk.Label(
@@ -73,7 +83,15 @@ class SortPrompt:
             fg=_FG,
             font=("Segoe UI", 11),
             wraplength=380,
-        ).pack(pady=(0, 12))
+        ).pack(pady=(0, 2))
+        if size_str:
+            tk.Label(
+                root,
+                text=size_str,
+                bg=_BG,
+                fg="#6c7086",
+                font=("Segoe UI", 9),
+            ).pack(pady=(0, 8))
         tk.Label(
             root,
             text="Where should it go?",
@@ -82,9 +100,22 @@ class SortPrompt:
             font=("Segoe UI", 10),
         ).pack()
 
-        # Destination buttons
-        frame = tk.Frame(root, bg=_BG)
-        frame.pack(pady=8, fill="x", padx=24)
+        # Scrollable destination buttons — show ALL destinations
+        canvas = tk.Canvas(root, bg=_BG, highlightthickness=0, height=180)
+        scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+        btn_frame = tk.Frame(canvas, bg=_BG)
+
+        btn_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=btn_frame, anchor="nw", width=370)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Only show scrollbar if there are many destinations
+        if len(self._destinations) > 6:
+            scrollbar.pack(side="right", fill="y", padx=(0, 8))
+        canvas.pack(pady=8, fill="x", padx=24)
 
         chosen: list[str | None] = [None]
 
@@ -92,10 +123,10 @@ class SortPrompt:
             chosen[0] = dest
             root.destroy()
 
-        for dest in self._destinations[:6]:  # Limit to 6 buttons
+        for dest in self._destinations:
             label = os.path.basename(dest) if os.path.sep in dest else dest
             btn = tk.Button(
-                frame,
+                btn_frame,
                 text=label,
                 bg=_BTN_BG,
                 fg=_BTN_FG,
@@ -105,6 +136,25 @@ class SortPrompt:
                 command=lambda d=dest: _choose(d),
             )
             btn.pack(fill="x", pady=2)
+
+        # "New folder…" button
+        def _new_folder() -> None:
+            folder = filedialog.askdirectory(
+                title="Choose new destination folder", parent=root
+            )
+            if folder:
+                _choose(folder)
+
+        tk.Button(
+            btn_frame,
+            text="📁 New folder…",
+            bg=_ACCENT,
+            fg="#1e1e2e",
+            activebackground="#b4d0fb",
+            relief="flat",
+            font=("Segoe UI", 10, "bold"),
+            command=_new_folder,
+        ).pack(fill="x", pady=(6, 2))
 
         # Always checkbox
         always_var = tk.BooleanVar(value=False)

@@ -73,3 +73,14 @@ class TestHistory:
         recent = hist.recent(1)
         assert recent[0]["undone"] is True
         hist.close()
+
+    def test_prune_keeps_max_actions(self):
+        """History should prune to HISTORY_MAX_ACTIONS (Q7.3)."""
+        from sort_it_now.constants import HISTORY_MAX_ACTIONS
+
+        hist = History(self._db_path)
+        for i in range(HISTORY_MAX_ACTIONS + 50):
+            hist.record(f"/src/{i}.txt", f"/dst/{i}.txt")
+        count = hist._conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]
+        assert count <= HISTORY_MAX_ACTIONS
+        hist.close()
