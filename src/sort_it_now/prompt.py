@@ -8,14 +8,9 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from typing import Callable
 
-logger = logging.getLogger(__name__)
+from sort_it_now.themes import get_theme
 
-# ── Colours / style ──────────────────────────────────────────────────
-_BG = "#1e1e2e"
-_FG = "#cdd6f4"
-_ACCENT = "#89b4fa"
-_BTN_BG = "#313244"
-_BTN_FG = "#cdd6f4"
+logger = logging.getLogger(__name__)
 
 
 class SortPrompt:
@@ -26,6 +21,7 @@ class SortPrompt:
         filepath: str,
         destinations: list[str],
         on_done: Callable[[str, str | None, bool], None],
+        theme: str = "dark",
     ) -> None:
         """
         Parameters
@@ -36,17 +32,22 @@ class SortPrompt:
             Ordered list of suggested destination folder paths.
         on_done:
             ``(filepath, chosen_destination_or_None, always_rule)``
+        theme:
+            Theme name (``'dark'`` or ``'light'``).
         """
         self._filepath = filepath
         self._destinations = destinations
         self._on_done = on_done
         self._always = False
+        self._theme_name = theme
 
     def show(self) -> None:
         """Display the prompt (blocks until user responds)."""
+        t = get_theme(self._theme_name)
+
         root = tk.Tk()
         root.title("Sort It Now")
-        root.configure(bg=_BG)
+        root.configure(bg=t["bg"])
         root.attributes("-topmost", True)
         root.resizable(False, False)
 
@@ -73,16 +74,16 @@ class SortPrompt:
         # Header
         tk.Label(
             root,
-            text="📥 New file detected",
-            bg=_BG,
-            fg=_ACCENT,
+            text="New file detected",
+            bg=t["bg"],
+            fg=t["accent"],
             font=("Segoe UI", 14, "bold"),
         ).pack(pady=(16, 4))
         tk.Label(
             root,
             text=basename,
-            bg=_BG,
-            fg=_FG,
+            bg=t["bg"],
+            fg=t["fg"],
             font=("Segoe UI", 11),
             wraplength=380,
         ).pack(pady=(0, 2))
@@ -90,22 +91,22 @@ class SortPrompt:
             tk.Label(
                 root,
                 text=size_str,
-                bg=_BG,
-                fg="#6c7086",
+                bg=t["bg"],
+                fg=t["muted"],
                 font=("Segoe UI", 9),
             ).pack(pady=(0, 8))
         tk.Label(
             root,
             text="Where should it go?",
-            bg=_BG,
-            fg=_FG,
+            bg=t["bg"],
+            fg=t["fg"],
             font=("Segoe UI", 10),
         ).pack()
 
-        # Scrollable destination buttons — show ALL destinations
-        canvas = tk.Canvas(root, bg=_BG, highlightthickness=0, height=180)
+        # Scrollable destination buttons -- show ALL destinations
+        canvas = tk.Canvas(root, bg=t["bg"], highlightthickness=0, height=180)
         scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
-        btn_frame = tk.Frame(canvas, bg=_BG)
+        btn_frame = tk.Frame(canvas, bg=t["bg"])
 
         btn_frame.bind(
             "<Configure>",
@@ -130,16 +131,16 @@ class SortPrompt:
             btn = tk.Button(
                 btn_frame,
                 text=label,
-                bg=_BTN_BG,
-                fg=_BTN_FG,
-                activebackground=_ACCENT,
+                bg=t["btn_bg"],
+                fg=t["btn_fg"],
+                activebackground=t["btn_active"],
                 relief="flat",
                 font=("Segoe UI", 10),
                 command=lambda d=dest: _choose(d),
             )
             btn.pack(fill="x", pady=2)
 
-        # "New folder…" button
+        # "New folder..." button
         def _new_folder() -> None:
             folder = filedialog.askdirectory(
                 title="Choose new destination folder", parent=root
@@ -149,10 +150,10 @@ class SortPrompt:
 
         tk.Button(
             btn_frame,
-            text="📁 New folder…",
-            bg=_ACCENT,
-            fg="#1e1e2e",
-            activebackground="#b4d0fb",
+            text="New folder...",
+            bg=t["accent"],
+            fg=t["bg"],
+            activebackground=t["btn_active"],
             relief="flat",
             font=("Segoe UI", 10, "bold"),
             command=_new_folder,
@@ -165,11 +166,11 @@ class SortPrompt:
             root,
             text=f"Always send {ext} files here",
             variable=always_var,
-            bg=_BG,
-            fg=_FG,
-            selectcolor=_BTN_BG,
-            activebackground=_BG,
-            activeforeground=_FG,
+            bg=t["bg"],
+            fg=t["fg"],
+            selectcolor=t["btn_bg"],
+            activebackground=t["bg"],
+            activeforeground=t["fg"],
             font=("Segoe UI", 9),
         )
         chk.pack(pady=(8, 4))
@@ -178,9 +179,9 @@ class SortPrompt:
         tk.Button(
             root,
             text="Ignore",
-            bg=_BG,
-            fg="#6c7086",
-            activebackground=_BTN_BG,
+            bg=t["bg"],
+            fg=t["muted"],
+            activebackground=t["btn_bg"],
             relief="flat",
             font=("Segoe UI", 9),
             command=root.destroy,
@@ -193,16 +194,19 @@ class SortPrompt:
 class SetupWizard:
     """First-run wizard to configure monitored folders and destinations."""
 
-    def __init__(self) -> None:
+    def __init__(self, theme: str = "dark") -> None:
         self.result: dict[str, list[str]] = {}
         self._root: tk.Tk | None = None
+        self._theme_name = theme
 
     def run(self) -> dict[str, list[str]]:
         """Show the wizard and return ``{folder: [destinations]}``."""
+        t = get_theme(self._theme_name)
+
         root = tk.Tk()
         self._root = root
-        root.title("Sort It Now — Setup")
-        root.configure(bg=_BG)
+        root.title("Sort It Now -- Setup")
+        root.configure(bg=t["bg"])
         root.resizable(False, False)
 
         w, h = 520, 480
@@ -212,21 +216,21 @@ class SetupWizard:
 
         tk.Label(
             root,
-            text="🗂️ Sort It Now — Setup",
-            bg=_BG,
-            fg=_ACCENT,
+            text="Sort It Now -- Setup",
+            bg=t["bg"],
+            fg=t["accent"],
             font=("Segoe UI", 16, "bold"),
         ).pack(pady=(20, 4))
         tk.Label(
             root,
             text="Add folders to monitor and their destination folders.",
-            bg=_BG,
-            fg=_FG,
+            bg=t["bg"],
+            fg=t["fg"],
             font=("Segoe UI", 10),
         ).pack(pady=(0, 12))
 
         # Monitored folders list
-        list_frame = tk.Frame(root, bg=_BG)
+        list_frame = tk.Frame(root, bg=t["bg"])
         list_frame.pack(fill="both", expand=True, padx=20, pady=4)
 
         tree = ttk.Treeview(
@@ -244,7 +248,7 @@ class SetupWizard:
                 tree.delete(item)
             for folder, dests in folders_data.items():
                 tree.insert(
-                    "", "end", values=(f"{folder}  →  {', '.join(dests)}",)
+                    "", "end", values=(f"{folder}  ->  {', '.join(dests)}",)
                 )
 
         def _add_folder() -> None:
@@ -270,13 +274,13 @@ class SetupWizard:
             self.result = folders_data
             root.destroy()
 
-        btn_frame = tk.Frame(root, bg=_BG)
+        btn_frame = tk.Frame(root, bg=t["bg"])
         btn_frame.pack(pady=12)
         tk.Button(
             btn_frame,
             text="+ Add Folder",
-            bg=_ACCENT,
-            fg="#1e1e2e",
+            bg=t["accent"],
+            fg=t["bg"],
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             command=_add_folder,
@@ -284,8 +288,8 @@ class SetupWizard:
         tk.Button(
             btn_frame,
             text="Done",
-            bg=_BTN_BG,
-            fg=_BTN_FG,
+            bg=t["btn_bg"],
+            fg=t["btn_fg"],
             font=("Segoe UI", 10),
             relief="flat",
             command=_done,
@@ -293,3 +297,44 @@ class SetupWizard:
 
         root.mainloop()
         return self.result
+
+
+def cli_setup() -> dict[str, list[str]]:
+    """CLI-based setup questionnaire (alternative to GUI wizard).
+
+    Returns ``{folder: [destinations]}`` or empty dict if cancelled.
+    """
+    print("\n=== Sort It Now -- CLI Setup ===\n")
+    folders: dict[str, list[str]] = {}
+
+    while True:
+        folder = input(
+            "Folder to monitor (press Enter to finish): "
+        ).strip()
+        if not folder:
+            break
+        if not os.path.isdir(folder):
+            print(f"  Warning: '{folder}' does not exist.")
+            cont = input("  Add anyway? (y/n): ").strip().lower()
+            if cont != "y":
+                continue
+
+        dests: list[str] = []
+        while True:
+            dest = input(
+                f"  Destination for '{os.path.basename(folder)}' "
+                "(press Enter to finish): "
+            ).strip()
+            if not dest:
+                break
+            dests.append(dest)
+
+        if dests:
+            folders[folder] = dests
+            print(f"  Added: {folder} -> {', '.join(dests)}")
+
+    if folders:
+        print(f"\nConfigured {len(folders)} folder(s).")
+    else:
+        print("\nNo folders configured.")
+    return folders

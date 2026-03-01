@@ -1,0 +1,261 @@
+"""Settings dialog for Sort It Now (tkinter-based).
+
+Lets the user edit config settings without touching JSON directly.
+"""
+
+from __future__ import annotations
+
+import logging
+import tkinter as tk
+from tkinter import filedialog
+from typing import TYPE_CHECKING
+
+from sort_it_now.autostart import is_autostart_enabled, set_autostart
+from sort_it_now.themes import get_theme
+
+if TYPE_CHECKING:
+    from sort_it_now.config import Config
+
+logger = logging.getLogger(__name__)
+
+
+class SettingsDialog:
+    """Modal settings window."""
+
+    def __init__(self, config: Config) -> None:
+        self._config = config
+        self._theme = get_theme(config.get_setting("theme", "dark"))
+
+    def show(self) -> None:
+        """Display the settings dialog (blocks until closed)."""
+        t = self._theme
+        root = tk.Tk()
+        root.title("Sort It Now -- Settings")
+        root.configure(bg=t["bg"])
+        root.resizable(False, False)
+
+        w, h = 480, 520
+        sx = root.winfo_screenwidth() // 2 - w // 2
+        sy = root.winfo_screenheight() // 2 - h // 2
+        root.geometry(f"{w}x{h}+{sx}+{sy}")
+
+        tk.Label(
+            root,
+            text="Settings",
+            bg=t["bg"],
+            fg=t["accent"],
+            font=("Segoe UI", 16, "bold"),
+        ).pack(pady=(16, 12))
+
+        frame = tk.Frame(root, bg=t["bg"])
+        frame.pack(fill="both", expand=True, padx=24)
+
+        row = 0
+
+        # -- Theme --
+        tk.Label(
+            frame, text="Theme:", bg=t["bg"], fg=t["fg"], font=("Segoe UI", 10)
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        theme_var = tk.StringVar(value=self._config.get_setting("theme", "dark"))
+        theme_menu = tk.OptionMenu(frame, theme_var, "dark", "light")
+        theme_menu.config(
+            bg=t["btn_bg"], fg=t["btn_fg"], font=("Segoe UI", 10),
+            activebackground=t["btn_active"], relief="flat",
+        )
+        theme_menu.grid(row=row, column=1, sticky="ew", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- Auto-learn --
+        tk.Label(
+            frame, text="Auto-learn:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        auto_learn_var = tk.BooleanVar(
+            value=self._config.get_setting("auto_learn", True)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Enabled",
+            variable=auto_learn_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- Auto-learn threshold --
+        tk.Label(
+            frame, text="Auto-learn threshold:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        threshold_var = tk.IntVar(
+            value=self._config.get_setting("auto_learn_threshold", 3)
+        )
+        tk.Spinbox(
+            frame, from_=1, to=20, textvariable=threshold_var, width=5,
+            bg=t["entry_bg"], fg=t["entry_fg"], font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- Prompt delay --
+        tk.Label(
+            frame, text="Prompt delay (s):", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        delay_var = tk.DoubleVar(
+            value=self._config.get_setting("prompt_delay_seconds", 3.0)
+        )
+        tk.Spinbox(
+            frame, from_=0.5, to=30.0, increment=0.5,
+            textvariable=delay_var, width=5,
+            bg=t["entry_bg"], fg=t["entry_fg"], font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- Batch mode --
+        tk.Label(
+            frame, text="Batch processing:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        batch_var = tk.StringVar(
+            value=self._config.get_setting("batch_mode_style", "one-by-one")
+        )
+        batch_menu = tk.OptionMenu(
+            frame, batch_var, "one-by-one", "batch-list"
+        )
+        batch_menu.config(
+            bg=t["btn_bg"], fg=t["btn_fg"], font=("Segoe UI", 10),
+            activebackground=t["btn_active"], relief="flat",
+        )
+        batch_menu.grid(row=row, column=1, sticky="ew", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- DND integration --
+        tk.Label(
+            frame, text="Pause when DND is on:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        dnd_var = tk.BooleanVar(
+            value=self._config.get_setting("pause_on_dnd", False)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Enabled",
+            variable=dnd_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- Autostart --
+        tk.Label(
+            frame, text="Start on login:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        autostart_var = tk.BooleanVar(value=is_autostart_enabled())
+        tk.Checkbutton(
+            frame,
+            text="Enabled",
+            variable=autostart_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
+        # -- Monitored folders section --
+        tk.Label(
+            frame, text="Monitored folders:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10, "bold"),
+        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        row += 1
+
+        folders_list = tk.Listbox(
+            frame, bg=t["list_bg"], fg=t["list_fg"],
+            selectbackground=t["list_select_bg"],
+            selectforeground=t["list_select_fg"],
+            font=("Segoe UI", 9), height=5, relief="flat",
+        )
+        folders_list.grid(
+            row=row, column=0, columnspan=2, sticky="ew", pady=4,
+        )
+        for folder in self._config.monitored_folders:
+            folders_list.insert("end", folder)
+        row += 1
+
+        folder_btn_frame = tk.Frame(frame, bg=t["bg"])
+        folder_btn_frame.grid(
+            row=row, column=0, columnspan=2, sticky="ew", pady=2,
+        )
+
+        def _add_folder() -> None:
+            folder = filedialog.askdirectory(
+                title="Select folder to monitor", parent=root
+            )
+            if folder:
+                dests: list[str] = []
+                while True:
+                    dest = filedialog.askdirectory(
+                        title=f"Add destination for {folder} (cancel to finish)",
+                        parent=root,
+                    )
+                    if not dest:
+                        break
+                    dests.append(dest)
+                if dests:
+                    self._config.add_monitored_folder(folder, dests)
+                    folders_list.insert("end", folder)
+
+        def _remove_folder() -> None:
+            sel = folders_list.curselection()
+            if sel:
+                folder = folders_list.get(sel[0])
+                self._config.remove_monitored_folder(folder)
+                folders_list.delete(sel[0])
+
+        tk.Button(
+            folder_btn_frame, text="+ Add", bg=t["accent"], fg=t["bg"],
+            font=("Segoe UI", 9, "bold"), relief="flat", command=_add_folder,
+        ).pack(side="left", padx=(0, 4))
+        tk.Button(
+            folder_btn_frame, text="- Remove", bg=t["danger"], fg="#ffffff",
+            font=("Segoe UI", 9, "bold"), relief="flat",
+            command=_remove_folder,
+        ).pack(side="left")
+        row += 1
+
+        frame.columnconfigure(1, weight=1)
+
+        # -- Save / Cancel --
+        def _save() -> None:
+            self._config.set_setting("theme", theme_var.get())
+            self._config.set_setting("auto_learn", auto_learn_var.get())
+            self._config.set_setting(
+                "auto_learn_threshold", threshold_var.get()
+            )
+            self._config.set_setting(
+                "prompt_delay_seconds", delay_var.get()
+            )
+            self._config.set_setting(
+                "batch_mode_style", batch_var.get()
+            )
+            self._config.set_setting("pause_on_dnd", dnd_var.get())
+            set_autostart(autostart_var.get())
+            logger.info("Settings saved.")
+            root.destroy()
+
+        btn_row = tk.Frame(root, bg=t["bg"])
+        btn_row.pack(pady=12)
+        tk.Button(
+            btn_row, text="Save", bg=t["accent"], fg=t["bg"],
+            font=("Segoe UI", 10, "bold"), relief="flat", command=_save,
+            width=10,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            btn_row, text="Cancel", bg=t["btn_bg"], fg=t["btn_fg"],
+            font=("Segoe UI", 10), relief="flat", command=root.destroy,
+            width=10,
+        ).pack(side="left", padx=4)
+
+        root.mainloop()

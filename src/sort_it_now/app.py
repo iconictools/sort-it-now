@@ -6,13 +6,18 @@ import logging
 import os
 import shutil
 import threading
+import time
 
 from sort_it_now.classifier import suggest_destinations
 from sort_it_now.config import Config
+from sort_it_now.conflict_ui import resolve_conflict
 from sort_it_now.constants import DEFAULT_UNSORTED_DIR
 from sort_it_now.history import History
 from sort_it_now.prompt import SortPrompt, SetupWizard
 from sort_it_now.rules import Rules
+from sort_it_now.rules_ui import RulesDialog
+from sort_it_now.settings_ui import SettingsDialog
+from sort_it_now.themes import get_theme
 from sort_it_now.tray import TrayIcon
 from sort_it_now.watcher import FolderWatcher
 
@@ -44,6 +49,8 @@ class App:
             on_open_dashboard=self._show_dashboard,
             on_toggle_focus=self._toggle_focus,
             on_undo=self._undo_last,
+            on_open_settings=self._show_settings,
+            on_open_rules=self._show_rules,
             on_quit=self._quit,
         )
 
@@ -72,7 +79,7 @@ class App:
 
         if missing:
             logger.warning(
-                "Missing monitored folders: %s — they will be skipped.",
+                "Missing monitored folders: %s -- they will be skipped.",
                 ", ".join(missing),
             )
 
@@ -109,7 +116,8 @@ class App:
         if self._focus_mode or self.config.get_setting("batch_mode", False):
             with self._lock:
                 self._batch_queue.append(filepath)
-            self.tray.set_pending(True)
+                count = len(self._batch_queue)
+            self.tray.set_pending(True, count)
             return
 
         # Check auto-rules
@@ -137,8 +145,11 @@ class App:
             filepath, destinations, self.rules.extension_map
         )
 
+        theme_name = self.config.get_setting("theme", "dark")
+
         # Show prompt on the main thread via threading
-        prompt = SortPrompt(filepath, ordered, self._on_prompt_done)
+        prompt = SortPrompt(filepath, ordered, self._on_prompt_done,
+                            theme=theme_name)
         t = threading.Thread(target=prompt.show, daemon=True)
         t.start()
 
@@ -168,18 +179,19 @@ class App:
         """Move *src* into *dest_dir*, recording the action.
 
         On failure, falls back to an "unsorted" folder so files are never lost.
+        Uses conflict resolution UI when a file already exists.
         """
         try:
             os.makedirs(dest_dir, exist_ok=True)
             dst = os.path.join(dest_dir, os.path.basename(src))
 
-            # Avoid overwriting
+            # Conflict resolution UI (Q11.15)
             if os.path.exists(dst):
-                base, ext = os.path.splitext(os.path.basename(src))
-                counter = 1
-                while os.path.exists(dst):
-                    dst = os.path.join(dest_dir, f"{base} ({counter}){ext}")
-                    counter += 1
+                resolved = resolve_conflict(src, dst, self.config)
+                if resolved is None:
+                    logger.info("Skipped (conflict): %s", src)
+                    return
+                dst = resolved
 
             self.watcher.mark_self_moved(dst)
             shutil.move(src, dst)
@@ -228,61 +240,289 @@ class App:
         else:
             logger.info("Nothing to undo.")
 
+    def _show_settings(self) -> None:
+        """Open the settings dialog."""
+        t = threading.Thread(
+            target=lambda: SettingsDialog(self.config).show(),
+            daemon=True,
+        )
+        t.start()
+
+    def _show_rules(self) -> None:
+        """Open the rule management dialog."""
+        t = threading.Thread(
+            target=lambda: RulesDialog(self.rules, self.config).show(),
+            daemon=True,
+        )
+        t.start()
+
     def _show_dashboard(self) -> None:
-        """Open a simple dashboard window showing pending & recent items."""
+        """Open the enhanced dashboard window."""
         t = threading.Thread(target=self._dashboard_window, daemon=True)
         t.start()
 
     def _dashboard_window(self) -> None:
         import tkinter as tk
 
-        root = tk.Tk()
-        root.title("Sort It Now — Dashboard")
-        root.configure(bg="#1e1e2e")
-        root.geometry("500x400")
+        theme = get_theme(self.config.get_setting("theme", "dark"))
 
+        root = tk.Tk()
+        root.title("Sort It Now -- Dashboard")
+        root.configure(bg=theme["bg"])
+        root.geometry("560x520")
+
+        # Tab-like sections
         tk.Label(
             root,
-            text="📋 Recent Actions",
-            bg="#1e1e2e",
-            fg="#89b4fa",
-            font=("Segoe UI", 14, "bold"),
+            text="Dashboard",
+            bg=theme["bg"], fg=theme["accent"],
+            font=("Segoe UI", 16, "bold"),
         ).pack(pady=(16, 8))
 
-        recent = self.history.recent(15)
-        for action in recent:
-            status = "↩️" if action["undone"] else "✅"
-            src_name = os.path.basename(action["src_path"])
-            dst_name = os.path.basename(os.path.dirname(action["dst_path"]))
-            text = f"{status}  {src_name}  →  {dst_name}"
-            tk.Label(
-                root,
-                text=text,
-                bg="#1e1e2e",
-                fg="#cdd6f4",
-                font=("Segoe UI", 9),
-                anchor="w",
-            ).pack(fill="x", padx=24, pady=1)
-
+        # -- Pending files --
         with self._lock:
             pending = len(self._batch_queue)
         if pending:
             tk.Label(
                 root,
-                text=f"\n⏳ {pending} file(s) pending (focus mode)",
-                bg="#1e1e2e",
-                fg="#f38ba8",
+                text=f"Pending: {pending} file(s) in queue (focus mode)",
+                bg=theme["bg"], fg=theme["danger"],
                 font=("Segoe UI", 10),
-            ).pack(pady=8)
+            ).pack(pady=4)
+
+        # -- Sorting stats (Q7.1b) --
+        stats_frame = tk.Frame(root, bg=theme["bg"])
+        stats_frame.pack(fill="x", padx=24, pady=4)
+
+        total = self.history.total_count()
+        today = self.history.count_since(time.time() - 86400)
+        week = self.history.count_since(time.time() - 7 * 86400)
+
+        tk.Label(
+            stats_frame,
+            text=f"Total sorted: {total}   |   Today: {today}   |   This week: {week}",
+            bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 10),
+        ).pack(anchor="w")
+
+        # -- Inbox Zero progress (Q7.1c) --
+        if pending > 0 or total > 0:
+            progress_frame = tk.Frame(root, bg=theme["bg"])
+            progress_frame.pack(fill="x", padx=24, pady=4)
+            ratio = max(0.0, 1.0 - (pending / max(pending + today, 1)))
+            bar_w = 400
+            canvas = tk.Canvas(
+                progress_frame, width=bar_w, height=20,
+                bg=theme["list_bg"], highlightthickness=0,
+            )
+            canvas.pack(anchor="w")
+            fill_w = int(bar_w * ratio)
+            canvas.create_rectangle(
+                0, 0, fill_w, 20, fill=theme["success"], outline=""
+            )
+            pct = int(ratio * 100)
+            tk.Label(
+                progress_frame,
+                text=f"Inbox Zero: {pct}%",
+                bg=theme["bg"], fg=theme["success"],
+                font=("Segoe UI", 9),
+            ).pack(anchor="w")
+
+        # -- Rules summary (Q7.1d) --
+        rules_count = len(self.rules.extension_map)
+        tk.Label(
+            root,
+            text=f"Active rules: {rules_count}",
+            bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 10),
+        ).pack(padx=24, anchor="w", pady=(8, 4))
+
+        # -- Undo history with clickable checkpoints (Q7.2) --
+        tk.Label(
+            root,
+            text="Recent Actions (click to undo back to that point):",
+            bg=theme["bg"], fg=theme["accent"],
+            font=("Segoe UI", 11, "bold"),
+        ).pack(pady=(12, 4), padx=24, anchor="w")
+
+        history_frame = tk.Frame(root, bg=theme["bg"])
+        history_frame.pack(fill="both", expand=True, padx=24, pady=4)
+
+        scrollbar = tk.Scrollbar(history_frame)
+        scrollbar.pack(side="right", fill="y")
+
+        history_list = tk.Listbox(
+            history_frame,
+            bg=theme["list_bg"], fg=theme["list_fg"],
+            selectbackground=theme["list_select_bg"],
+            selectforeground=theme["list_select_fg"],
+            font=("Segoe UI", 9), relief="flat",
+            yscrollcommand=scrollbar.set,
+        )
+        history_list.pack(fill="both", expand=True)
+        scrollbar.config(command=history_list.yview)
+
+        recent = self.history.recent(50)
+        for action in recent:
+            status = "[undone]" if action["undone"] else "[done]"
+            src_name = os.path.basename(action["src_path"])
+            dst_name = os.path.basename(os.path.dirname(action["dst_path"]))
+            history_list.insert(
+                "end", f"{status}  {src_name}  ->  {dst_name}"
+            )
+
+        def _undo_to_selected() -> None:
+            sel = history_list.curselection()
+            if not sel:
+                return
+            # Undo all actions from most recent up to (and including) selected
+            idx = sel[0]
+            actions_to_undo = recent[: idx + 1]
+            undone_count = 0
+            for action in actions_to_undo:
+                if not action["undone"]:
+                    result = self.history.undo_by_id(action["id"])
+                    if result:
+                        self.watcher.mark_self_moved(result[1])
+                        undone_count += 1
+            if undone_count:
+                logger.info("Bulk undone %d action(s).", undone_count)
+            # Refresh list
+            history_list.delete(0, "end")
+            refreshed = self.history.recent(50)
+            for action in refreshed:
+                status = "[undone]" if action["undone"] else "[done]"
+                src_name = os.path.basename(action["src_path"])
+                dst_name = os.path.basename(
+                    os.path.dirname(action["dst_path"])
+                )
+                history_list.insert(
+                    "end", f"{status}  {src_name}  ->  {dst_name}"
+                )
+
+        btn_frame = tk.Frame(root, bg=theme["bg"])
+        btn_frame.pack(pady=8)
+        tk.Button(
+            btn_frame, text="Undo to selected",
+            bg=theme["accent"], fg=theme["bg"],
+            font=("Segoe UI", 10, "bold"), relief="flat",
+            command=_undo_to_selected,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            btn_frame, text="Close",
+            bg=theme["btn_bg"], fg=theme["btn_fg"],
+            font=("Segoe UI", 10), relief="flat",
+            command=root.destroy,
+        ).pack(side="left", padx=4)
 
         root.mainloop()
 
     def _process_batch_queue(self) -> None:
-        """Process all files queued during focus mode."""
+        """Process all files queued during focus mode.
+
+        Respects the ``batch_mode_style`` setting (Q6.2):
+        - ``'one-by-one'``: process each file individually
+        - ``'batch-list'``: show a batch window
+        """
         with self._lock:
             queue = list(self._batch_queue)
             self._batch_queue.clear()
         self.tray.set_pending(False)
+
+        style = self.config.get_setting("batch_mode_style", "one-by-one")
+        if style == "batch-list" and queue:
+            self._batch_list_window(queue)
+        else:
+            for filepath in queue:
+                if os.path.exists(filepath):
+                    self._on_file_detected(filepath)
+
+    def _batch_list_window(self, queue: list[str]) -> None:
+        """Show a batch processing window listing all pending files."""
+        import tkinter as tk
+        from tkinter import ttk
+
+        theme = get_theme(self.config.get_setting("theme", "dark"))
+
+        root = tk.Tk()
+        root.title("Sort It Now -- Batch Processing")
+        root.configure(bg=theme["bg"])
+        root.geometry("600x400")
+
+        tk.Label(
+            root,
+            text=f"Batch: {len(queue)} file(s) pending",
+            bg=theme["bg"], fg=theme["accent"],
+            font=("Segoe UI", 14, "bold"),
+        ).pack(pady=(16, 8))
+
+        # For each file, let user pick a destination
+        canvas = tk.Canvas(root, bg=theme["bg"], highlightthickness=0)
+        scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg=theme["bg"])
+        inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=inner, anchor="nw", width=560)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(fill="both", expand=True, padx=16, pady=4)
+
+        dest_vars: list[tuple[str, tk.StringVar]] = []
+
+        # Collect all known destinations
+        all_dests: list[str] = []
+        for dests in self.config.monitored_folders.values():
+            for d in dests:
+                if d not in all_dests:
+                    all_dests.append(d)
+
         for filepath in queue:
-            if os.path.exists(filepath):
-                self._on_file_detected(filepath)
+            if not os.path.exists(filepath):
+                continue
+            row = tk.Frame(inner, bg=theme["bg"])
+            row.pack(fill="x", pady=2)
+
+            tk.Label(
+                row, text=os.path.basename(filepath),
+                bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
+                width=30, anchor="w",
+            ).pack(side="left")
+
+            dest_var = tk.StringVar(value=all_dests[0] if all_dests else "")
+            if all_dests:
+                menu = ttk.Combobox(
+                    row, textvariable=dest_var, values=all_dests,
+                    state="readonly", width=30,
+                )
+                menu.pack(side="left", padx=4)
+            dest_vars.append((filepath, dest_var))
+
+        def _process_all() -> None:
+            for filepath, var in dest_vars:
+                dest = var.get()
+                if dest and os.path.exists(filepath):
+                    self._move_file(filepath, dest)
+                    threshold = self.config.get_setting(
+                        "auto_learn_threshold", 3
+                    )
+                    self.rules.record_action(
+                        filepath, dest, threshold=threshold
+                    )
+            root.destroy()
+
+        btn_frame = tk.Frame(root, bg=theme["bg"])
+        btn_frame.pack(pady=8)
+        tk.Button(
+            btn_frame, text="Move All",
+            bg=theme["accent"], fg=theme["bg"],
+            font=("Segoe UI", 10, "bold"), relief="flat",
+            command=_process_all,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            btn_frame, text="Cancel",
+            bg=theme["btn_bg"], fg=theme["btn_fg"],
+            font=("Segoe UI", 10), relief="flat",
+            command=root.destroy,
+        ).pack(side="left", padx=4)
+
+        root.mainloop()

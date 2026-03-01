@@ -83,6 +83,29 @@ class History:
         self._conn.commit()
         return dst_path, src_path
 
+    def undo_by_id(self, action_id: int) -> tuple[str, str] | None:
+        """Undo a specific action by its *action_id*.
+
+        Returns ``(dst_path, src_path)`` on success, or *None*.
+        """
+        row = self._conn.execute(
+            "SELECT src_path, dst_path, undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        if row is None or row[2]:
+            return None
+
+        src_path, dst_path = row[0], row[1]
+        if os.path.exists(dst_path):
+            os.makedirs(os.path.dirname(src_path) or ".", exist_ok=True)
+            shutil.move(dst_path, src_path)
+
+        self._conn.execute(
+            "UPDATE actions SET undone = 1 WHERE id = ?", (action_id,)
+        )
+        self._conn.commit()
+        return dst_path, src_path
+
     # ------------------------------------------------------------------
     # Queries
     # ------------------------------------------------------------------
@@ -109,6 +132,19 @@ class History:
         """Return the number of recorded but not-yet-undone actions."""
         row = self._conn.execute(
             "SELECT COUNT(*) FROM actions WHERE undone = 0"
+        ).fetchone()
+        return row[0] if row else 0
+
+    def total_count(self) -> int:
+        """Return the total number of actions ever recorded."""
+        row = self._conn.execute("SELECT COUNT(*) FROM actions").fetchone()
+        return row[0] if row else 0
+
+    def count_since(self, since_timestamp: float) -> int:
+        """Return the number of actions recorded after *since_timestamp*."""
+        row = self._conn.execute(
+            "SELECT COUNT(*) FROM actions WHERE timestamp >= ?",
+            (since_timestamp,),
         ).fetchone()
         return row[0] if row else 0
 

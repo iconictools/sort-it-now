@@ -3,6 +3,7 @@
 Usage:
     python -m sort_it_now          # Run the app (GUI)
     python -m sort_it_now --help   # Show help
+    python -m sort_it_now --setup-cli  # CLI setup wizard
 """
 
 from __future__ import annotations
@@ -69,6 +70,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable debug logging."
     )
+    parser.add_argument(
+        "--setup-cli",
+        action="store_true",
+        help="Run the CLI setup wizard instead of the GUI wizard.",
+    )
     args = parser.parse_args(argv)
 
     _setup_logging(args.verbose)
@@ -77,6 +83,17 @@ def main(argv: list[str] | None = None) -> None:
     from sort_it_now.app import App
 
     config = Config(args.config)
+
+    # CLI setup mode (Q2.1c)
+    if args.setup_cli:
+        from sort_it_now.prompt import cli_setup
+
+        folders = cli_setup()
+        for folder, dests in folders.items():
+            config.add_monitored_folder(folder, dests)
+        if not folders:
+            return
+
     app = App(config=config)
     app.run()
 
