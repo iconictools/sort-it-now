@@ -305,10 +305,11 @@ class App:
         ).pack(anchor="w")
 
         # -- Inbox Zero progress (Q7.1c) --
-        if pending > 0 or total > 0:
+        if pending > 0 or today > 0:
             progress_frame = tk.Frame(root, bg=theme["bg"])
             progress_frame.pack(fill="x", padx=24, pady=4)
-            ratio = max(0.0, 1.0 - (pending / max(pending + today, 1)))
+            processed = today - pending if today > pending else today
+            ratio = max(0.0, processed / max(today, 1))
             bar_w = 400
             canvas = tk.Canvas(
                 progress_frame, width=bar_w, height=20,
@@ -475,6 +476,13 @@ class App:
             for d in dests:
                 if d not in all_dests:
                     all_dests.append(d)
+
+        if not all_dests:
+            tk.Label(
+                inner,
+                text="No destinations configured. Add folders in Settings.",
+                bg=theme["bg"], fg=theme["danger"], font=("Segoe UI", 10),
+            ).pack(pady=8)
 
         for filepath in queue:
             if not os.path.exists(filepath):

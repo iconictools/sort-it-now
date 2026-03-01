@@ -40,10 +40,7 @@ def _create_icon_image(
             fill="#f38ba8",
         )
         label = str(badge_count) if badge_count <= 99 else "99+"
-        try:
-            font = ImageFont.truetype("arial.ttf", 14)
-        except (IOError, OSError):
-            font = ImageFont.load_default()
+        font = ImageFont.load_default()
         bbox = draw.textbbox((0, 0), label, font=font)
         tw = bbox[2] - bbox[0]
         th = bbox[3] - bbox[1]

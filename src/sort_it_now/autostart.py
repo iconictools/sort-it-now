@@ -57,8 +57,6 @@ def set_autostart(enabled: bool) -> bool:
         )
         try:
             if enabled:
-                exe = sys.executable
-                # If running as a frozen executable, use that path
                 if getattr(sys, "frozen", False):
                     exe = sys.executable
                 else:
