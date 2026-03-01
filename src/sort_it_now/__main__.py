@@ -5,6 +5,8 @@ Usage:
     python -m sort_it_now --help   # Show help
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 import logging.handlers

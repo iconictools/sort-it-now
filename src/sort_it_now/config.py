@@ -3,6 +3,8 @@
 Stores monitored folders, destination sets, and user preferences as JSON.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os

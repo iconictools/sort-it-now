@@ -1,5 +1,7 @@
 """Undo / action history backed by SQLite for Sort It Now."""
 
+from __future__ import annotations
+
 import os
 import shutil
 import sqlite3

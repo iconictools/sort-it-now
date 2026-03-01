@@ -4,6 +4,8 @@ Persists extension-to-destination mappings so the app can auto-sort
 files the user has previously classified.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os

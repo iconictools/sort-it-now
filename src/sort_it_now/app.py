@@ -1,5 +1,7 @@
 """Main application orchestrator for Sort It Now."""
 
+from __future__ import annotations
+
 import logging
 import os
 import shutil

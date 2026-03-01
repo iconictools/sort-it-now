@@ -4,6 +4,8 @@ Suggests destination folders based on file extension, name patterns,
 and learned rules.
 """
 
+from __future__ import annotations
+
 import os
 from fnmatch import fnmatch
 

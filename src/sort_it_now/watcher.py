@@ -4,6 +4,8 @@ Uses *watchdog* to monitor folders for new, moved, or modified files.
 Implements smart delay to wait for downloads to finish before prompting.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import time

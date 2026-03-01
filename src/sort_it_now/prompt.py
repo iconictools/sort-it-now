@@ -1,5 +1,7 @@
 """User prompt dialogs for Sort It Now (tkinter-based)."""
 
+from __future__ import annotations
+
 import logging
 import os
 import tkinter as tk
