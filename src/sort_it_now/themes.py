@@ -47,5 +47,5 @@ THEMES: dict[str, dict[str, str]] = {"dark": _DARK, "light": _LIGHT}
 
 
 def get_theme(name: str) -> dict[str, str]:
-    """Return the colour dictionary for *name* (``'dark'`` or ``'light'``)."""
+    """Return the color dictionary for *name* (``'dark'`` or ``'light'``)."""
     return THEMES.get(name, _DARK)

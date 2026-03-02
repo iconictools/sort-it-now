@@ -48,7 +48,7 @@ def _is_dnd_active() -> bool:
             data, _ = winreg.QueryValueEx(key, "Data")
             # A non-empty Data value indicates Focus Assist is enabled.
             return bool(data)
-        except FileNotFoundError:
+        except OSError:
             return False
         finally:
             winreg.CloseKey(key)

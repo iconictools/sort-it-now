@@ -57,7 +57,7 @@ class TestThemes:
             assert key in theme
 
     def test_all_theme_values_are_strings(self):
-        """All colour values must be strings (hex codes)."""
+        """All color values must be strings (hex codes)."""
         for name in THEMES:
             for key, value in THEMES[name].items():
                 assert isinstance(value, str), f"THEMES[{name!r}][{key!r}]"
