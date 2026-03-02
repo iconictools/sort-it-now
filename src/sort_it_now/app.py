@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sys
 import threading
 import time
 
@@ -22,6 +23,37 @@ from sort_it_now.tray import TrayIcon
 from sort_it_now.watcher import FolderWatcher
 
 logger = logging.getLogger(__name__)
+
+
+def _is_dnd_active() -> bool:
+    """Check if system Do Not Disturb / Focus Assist is active (Windows).
+
+    Returns *False* on non-Windows platforms or when the state cannot be read.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import winreg
+
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\CloudStore"
+            r"\Store\DefaultAccount\Current"
+            r"\default$windows.data.notifications.quiethourssettings"
+            r"\windows.data.notifications.quiethourssettings",
+            0,
+            winreg.KEY_READ,
+        )
+        try:
+            data, _ = winreg.QueryValueEx(key, "Data")
+            # A non-empty Data value indicates Focus Assist is enabled.
+            return bool(data)
+        except FileNotFoundError:
+            return False
+        finally:
+            winreg.CloseKey(key)
+    except Exception:
+        return False
 
 
 class App:
@@ -113,7 +145,15 @@ class App:
         """Called by the watcher when a new/stable file is detected."""
         logger.info("Detected: %s", filepath)
 
-        if self._focus_mode or self.config.get_setting("batch_mode", False):
+        # Pause when DND / Focus Assist is active (Q6.3)
+        if self.config.get_setting("pause_on_dnd", False) and _is_dnd_active():
+            with self._lock:
+                self._batch_queue.append(filepath)
+                count = len(self._batch_queue)
+            self.tray.set_pending(True, count)
+            return
+
+        if self._focus_mode:
             with self._lock:
                 self._batch_queue.append(filepath)
                 count = len(self._batch_queue)

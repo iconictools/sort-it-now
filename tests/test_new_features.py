@@ -4,11 +4,25 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import tempfile
 import time
 
+import pytest
+
 from sort_it_now.history import History
 from sort_it_now.themes import get_theme, THEMES
+
+# tkinter is not available in headless CI environments
+_has_tkinter = True
+try:
+    import tkinter  # noqa: F401
+except ModuleNotFoundError:
+    _has_tkinter = False
+
+skip_no_tkinter = pytest.mark.skipif(
+    not _has_tkinter, reason="tkinter not available"
+)
 
 
 class TestThemes:
@@ -30,6 +44,23 @@ class TestThemes:
 
     def test_themes_have_distinct_backgrounds(self):
         assert get_theme("dark")["bg"] != get_theme("light")["bg"]
+
+    def test_dark_theme_has_list_keys(self):
+        """Dashboard uses list_bg, list_fg, list_select_bg, list_select_fg."""
+        theme = get_theme("dark")
+        for key in ("list_bg", "list_fg", "list_select_bg", "list_select_fg"):
+            assert key in theme
+
+    def test_light_theme_has_list_keys(self):
+        theme = get_theme("light")
+        for key in ("list_bg", "list_fg", "list_select_bg", "list_select_fg"):
+            assert key in theme
+
+    def test_all_theme_values_are_strings(self):
+        """All colour values must be strings (hex codes)."""
+        for name in THEMES:
+            for key, value in THEMES[name].items():
+                assert isinstance(value, str), f"THEMES[{name!r}][{key!r}]"
 
 
 class TestHistoryExtensions:
@@ -93,3 +124,68 @@ class TestHistoryExtensions:
         h = History(self._db)
         assert h.undo_by_id(9999) is None
         h.close()
+
+
+class TestAutostart:
+    """Tests for autostart module (platform-independent logic)."""
+
+    def test_is_autostart_returns_false_on_non_windows(self):
+        from sort_it_now.autostart import is_autostart_enabled
+
+        if sys.platform != "win32":
+            assert is_autostart_enabled() is False
+
+    def test_set_autostart_returns_false_on_non_windows(self):
+        from sort_it_now.autostart import set_autostart
+
+        if sys.platform != "win32":
+            assert set_autostart(True) is False
+            assert set_autostart(False) is False
+
+
+class TestDndCheck:
+    """Tests for the DND / Focus Assist helper."""
+
+    @skip_no_tkinter
+    def test_dnd_returns_false_on_non_windows(self):
+        from sort_it_now.app import _is_dnd_active
+
+        if sys.platform != "win32":
+            assert _is_dnd_active() is False
+
+
+class TestModuleImports:
+    """Verify all new modules can be imported without errors."""
+
+    def test_import_themes(self):
+        import sort_it_now.themes
+        assert hasattr(sort_it_now.themes, "get_theme")
+
+    def test_import_autostart(self):
+        import sort_it_now.autostart
+        assert hasattr(sort_it_now.autostart, "is_autostart_enabled")
+
+    @skip_no_tkinter
+    def test_import_conflict_ui(self):
+        import sort_it_now.conflict_ui
+        assert hasattr(sort_it_now.conflict_ui, "resolve_conflict")
+
+    @skip_no_tkinter
+    def test_import_settings_ui(self):
+        import sort_it_now.settings_ui
+        assert hasattr(sort_it_now.settings_ui, "SettingsDialog")
+
+    @skip_no_tkinter
+    def test_import_rules_ui(self):
+        import sort_it_now.rules_ui
+        assert hasattr(sort_it_now.rules_ui, "RulesDialog")
+
+    @skip_no_tkinter
+    def test_import_app_dnd(self):
+        from sort_it_now.app import _is_dnd_active
+        assert callable(_is_dnd_active)
+
+    @skip_no_tkinter
+    def test_import_prompt_cli_setup(self):
+        from sort_it_now.prompt import cli_setup
+        assert callable(cli_setup)
