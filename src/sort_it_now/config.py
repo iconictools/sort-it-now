@@ -61,7 +61,7 @@ class Config:
                     self._data = json.load(fh)
             except (json.JSONDecodeError, ValueError) as exc:
                 logger.warning(
-                    "Config file corrupted (%s) — backing up and resetting.",
+                    "Config file corrupted (%s) -- backing up and resetting.",
                     exc,
                 )
                 backup = f"{self.path}.bak.{int(time.time())}"

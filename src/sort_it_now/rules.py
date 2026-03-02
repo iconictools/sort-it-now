@@ -38,7 +38,7 @@ class Rules:
                     self._data = json.load(fh)
             except (json.JSONDecodeError, ValueError) as exc:
                 logger.warning(
-                    "Rules file corrupted (%s) — backing up and resetting.",
+                    "Rules file corrupted (%s) -- backing up and resetting.",
                     exc,
                 )
                 backup = f"{self.path}.bak.{int(time.time())}"

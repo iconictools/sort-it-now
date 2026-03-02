@@ -37,7 +37,7 @@ def main() -> None:
 
     print(f"Running: {' '.join(cmd)}")
     subprocess.check_call(cmd)
-    print("\n✅ Build complete! Output in dist/")
+    print("\nBuild complete! Output in dist/")
 
 
 if __name__ == "__main__":
