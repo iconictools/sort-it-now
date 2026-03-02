@@ -24,6 +24,17 @@ skip_no_tkinter = pytest.mark.skipif(
     not _has_tkinter, reason="tkinter not available"
 )
 
+# pystray requires an X display on Linux; detect headless CI
+_has_display = True
+try:
+    import pystray  # noqa: F401
+except Exception:
+    _has_display = False
+
+skip_no_display = pytest.mark.skipif(
+    not _has_display, reason="pystray requires a display (headless CI)"
+)
+
 
 class TestThemes:
     def test_dark_theme_has_required_keys(self):
@@ -146,7 +157,7 @@ class TestAutostart:
 class TestDndCheck:
     """Tests for the DND / Focus Assist helper."""
 
-    @skip_no_tkinter
+    @skip_no_display
     def test_dnd_returns_false_on_non_windows(self):
         from sort_it_now.app import _is_dnd_active
 
@@ -180,7 +191,7 @@ class TestModuleImports:
         import sort_it_now.rules_ui
         assert hasattr(sort_it_now.rules_ui, "RulesDialog")
 
-    @skip_no_tkinter
+    @skip_no_display
     def test_import_app_dnd(self):
         from sort_it_now.app import _is_dnd_active
         assert callable(_is_dnd_active)
