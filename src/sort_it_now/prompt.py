@@ -225,7 +225,7 @@ class SortPrompt:
                 activebackground=t["btn_active"],
                 relief="flat",
                 font=("Segoe UI", 10),
-                command=lambda d=dest: _choose(d),
+                command=lambda d=dest: _choose(d),  # type: ignore[misc]
             )
             btn.pack(fill="x", pady=2)
 

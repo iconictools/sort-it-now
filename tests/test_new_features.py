@@ -371,7 +371,7 @@ class TestWhitelist:
 
 
 class TestRenamePattern:
-    @skip_no_tkinter
+    @skip_no_display
     def test_apply_rename_pattern_with_date_and_name(self):
         import datetime
         from sort_it_now.app import _apply_rename_pattern
@@ -379,13 +379,13 @@ class TestRenamePattern:
         today = datetime.date.today().isoformat()
         assert result == f"{today}_report.pdf"
 
-    @skip_no_tkinter
+    @skip_no_display
     def test_apply_rename_pattern_preserves_ext(self):
         from sort_it_now.app import _apply_rename_pattern
         result = _apply_rename_pattern("/tmp/file.txt", "{name}_copy")
         assert result.endswith(".txt")
 
-    @skip_no_tkinter
+    @skip_no_display
     def test_apply_rename_pattern_with_ext_token(self):
         from sort_it_now.app import _apply_rename_pattern
         result = _apply_rename_pattern("/tmp/data.csv", "{name}{ext}")
