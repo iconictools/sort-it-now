@@ -8,14 +8,22 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import logging
-import logging.handlers
-import os
 import sys
 
-from sort_it_now import __version__
-from sort_it_now.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE
+# Reconfigure stdout/stderr to UTF-8 early, before any other imports or
+# print/log calls.  On Windows the default encoding is cp1252 which cannot
+# represent many Unicode characters and causes UnicodeEncodeError.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
+import argparse  # noqa: E402
+import logging  # noqa: E402
+import logging.handlers  # noqa: E402
+import os  # noqa: E402
+
+from sort_it_now import __version__  # noqa: E402
+from sort_it_now.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE  # noqa: E402
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -26,16 +34,9 @@ def _setup_logging(verbose: bool) -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    # Console handler — use UTF-8 with replacement to avoid
-    # UnicodeEncodeError on Windows (cp1252 default).
-    console_stream = open(  # noqa: SIM115
-        sys.stderr.fileno(),
-        mode="w",
-        encoding="utf-8",
-        errors="replace",
-        closefd=False,
-    )
-    console = logging.StreamHandler(console_stream)
+    # Console handler -- sys.stderr is already reconfigured to UTF-8 at
+    # module level, so we can attach directly.
+    console = logging.StreamHandler(sys.stderr)
     console.setLevel(level)
     console.setFormatter(logging.Formatter(fmt))
     root_logger.addHandler(console)
