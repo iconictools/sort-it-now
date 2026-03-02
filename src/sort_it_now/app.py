@@ -271,12 +271,15 @@ class App:
         try:
             os.makedirs(dest_dir, exist_ok=True)
 
-            # Apply rename pattern if configured
-            _, ext = os.path.splitext(src)
-            rename_pat = self.config.get_rename_pattern(ext.lower())
-            if rename_pat:
-                new_name = _apply_rename_pattern(src, rename_pat)
-                dst = os.path.join(dest_dir, new_name)
+            # Apply rename pattern if configured (files only, not folders)
+            if not os.path.isdir(src):
+                _, ext = os.path.splitext(src)
+                rename_pat = self.config.get_rename_pattern(ext.lower())
+                if rename_pat:
+                    new_name = _apply_rename_pattern(src, rename_pat)
+                    dst = os.path.join(dest_dir, new_name)
+                else:
+                    dst = os.path.join(dest_dir, os.path.basename(src))
             else:
                 dst = os.path.join(dest_dir, os.path.basename(src))
 
