@@ -53,6 +53,7 @@ class _Handler(FileSystemEventHandler):
         callback: Callable[[str], None],
         ignore_patterns: list[str],
         self_moved_paths: set[str],
+        catch_folders: bool = False,
     ) -> None:
         super().__init__()
         self._callback = callback
@@ -60,10 +61,11 @@ class _Handler(FileSystemEventHandler):
         self._self_moved: set[str] = self_moved_paths
         self._pending: set[str] = set()
         self._lock = threading.Lock()
+        self._catch_folders = catch_folders
 
     def _should_ignore(self, path: str) -> bool:
         if os.path.isdir(path):
-            return True
+            return not self._catch_folders
         basename = os.path.basename(path)
         if matches_ignore_pattern(basename, self._ignore_patterns):
             return True
@@ -111,18 +113,24 @@ class FolderWatcher:
     Parameters
     ----------
     callback:
-        Called with the absolute path of every newly-detected file.
+        Called with the absolute path of every newly-detected file
+        (or folder, when *catch_folders* is enabled).
     ignore_patterns:
         Shell-glob patterns for filenames to ignore.
+    catch_folders:
+        When *True*, directories created/moved into a monitored folder
+        are also dispatched to the callback.
     """
 
     def __init__(
         self,
         callback: Callable[[str], None],
         ignore_patterns: list[str] | None = None,
+        catch_folders: bool = False,
     ) -> None:
         self._callback = callback
         self._ignore_patterns = ignore_patterns or []
+        self._catch_folders = catch_folders
         self._observer = Observer()
         self._self_moved_paths: set[str] = set()
         self._watches: dict[str, object] = {}
@@ -137,7 +145,8 @@ class FolderWatcher:
         if folder in self._watches:
             return
         handler = _Handler(
-            self._callback, self._ignore_patterns, self._self_moved_paths
+            self._callback, self._ignore_patterns, self._self_moved_paths,
+            catch_folders=self._catch_folders,
         )
         watch = self._observer.schedule(handler, folder, recursive=False)
         self._watches[folder] = watch
@@ -165,21 +174,23 @@ class FolderWatcher:
         callback: Callable[[str], None],
         whitelist: list[str] | None = None,
     ) -> None:
-        """Scan *folder* for existing files and call *callback* for each.
+        """Scan *folder* for existing files (and folders when enabled).
 
         Respects ignore patterns and optional *whitelist* patterns.
         """
         folder = os.path.abspath(folder)
         wl = whitelist or []
         for entry in os.scandir(folder):
-            if not entry.is_file():
-                continue
+            if entry.is_dir():
+                if not self._catch_folders:
+                    continue
+            else:
+                if is_temp_file(entry.path):
+                    continue
             basename = entry.name
             if matches_ignore_pattern(basename, self._ignore_patterns):
                 continue
-            if is_temp_file(entry.path):
-                continue
-            # Skip whitelisted files
+            # Skip whitelisted items
             skip = False
             for pat in wl:
                 if fnmatch_mod.fnmatch(basename, pat):

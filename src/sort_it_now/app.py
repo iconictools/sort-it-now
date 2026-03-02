@@ -96,6 +96,7 @@ class App:
         self.watcher = FolderWatcher(
             callback=self._on_file_detected,
             ignore_patterns=self.config.ignore_patterns,
+            catch_folders=self.config.get_setting("catch_folders", False),
         )
         self.tray = TrayIcon(
             on_open_dashboard=self._show_dashboard,
@@ -171,7 +172,7 @@ class App:
     # ------------------------------------------------------------------
 
     def _on_file_detected(self, filepath: str) -> None:
-        """Called by the watcher when a new/stable file is detected."""
+        """Called by the watcher when a new/stable file or folder is detected."""
         logger.info("Detected: %s", filepath)
 
         # Skip whitelisted files
@@ -231,8 +232,11 @@ class App:
         theme_name = self.config.get_setting("theme", "dark")
 
         # Show prompt on the main thread via threading
-        prompt = SortPrompt(filepath, ordered, self._on_prompt_done,
-                            theme=theme_name)
+        prompt = SortPrompt(
+            filepath, ordered, self._on_prompt_done,
+            theme=theme_name,
+            on_whitelist=self.config.add_to_whitelist,
+        )
         t = threading.Thread(target=prompt.show, daemon=True)
         t.start()
 
@@ -259,9 +263,9 @@ class App:
     # ------------------------------------------------------------------
 
     def _move_file(self, src: str, dest_dir: str) -> None:
-        """Move *src* into *dest_dir*, recording the action.
+        """Move *src* (file or folder) into *dest_dir*, recording the action.
 
-        On failure, falls back to an "unsorted" folder so files are never lost.
+        On failure, falls back to an "unsorted" folder so items are never lost.
         Uses conflict resolution UI when a file already exists.
         """
         try:

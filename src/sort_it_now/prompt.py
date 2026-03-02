@@ -22,6 +22,7 @@ class SortPrompt:
         destinations: list[str],
         on_done: Callable[[str, str | None, bool], None],
         theme: str = "dark",
+        on_whitelist: Callable[[str], None] | None = None,
     ) -> None:
         """
         Parameters
@@ -34,12 +35,15 @@ class SortPrompt:
             ``(filepath, chosen_destination_or_None, always_rule)``
         theme:
             Theme name (``'dark'`` or ``'light'``).
+        on_whitelist:
+            Called with a glob pattern when the user clicks "Add to whitelist".
         """
         self._filepath = filepath
         self._destinations = destinations
         self._on_done = on_done
         self._always = False
         self._theme_name = theme
+        self._on_whitelist = on_whitelist
 
     def show(self) -> None:
         """Display the prompt (blocks until user responds)."""
@@ -58,23 +62,27 @@ class SortPrompt:
         root.geometry(f"{w}x{h}+{sx}+{sy}")
 
         basename = os.path.basename(self._filepath)
+        is_dir = os.path.isdir(self._filepath)
 
-        # File size
-        try:
-            size_bytes = os.path.getsize(self._filepath)
-            if size_bytes < 1024:
-                size_str = f"{size_bytes} B"
-            elif size_bytes < 1024 * 1024:
-                size_str = f"{size_bytes / 1024:.1f} KB"
-            else:
-                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
-        except OSError:
-            size_str = ""
+        # File size (skip for directories)
+        size_str = ""
+        if not is_dir:
+            try:
+                size_bytes = os.path.getsize(self._filepath)
+                if size_bytes < 1024:
+                    size_str = f"{size_bytes} B"
+                elif size_bytes < 1024 * 1024:
+                    size_str = f"{size_bytes / 1024:.1f} KB"
+                else:
+                    size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+            except OSError:
+                size_str = ""
 
         # Header
+        header_text = "New folder detected" if is_dir else "New file detected"
         tk.Label(
             root,
-            text="New file detected",
+            text=header_text,
             bg=t["bg"],
             fg=t["accent"],
             font=("Segoe UI", 14, "bold"),
@@ -256,9 +264,36 @@ class SortPrompt:
         )
         chk.pack(pady=(8, 4))
 
+        # Bottom buttons row
+        bottom_frame = tk.Frame(root, bg=t["bg"])
+        bottom_frame.pack(pady=(0, 8))
+
+        whitelisted = [False]
+
+        # Add to whitelist button
+        if self._on_whitelist is not None:
+            def _add_to_whitelist() -> None:
+                # Whitelist by exact filename
+                name = os.path.basename(self._filepath)
+                if self._on_whitelist is not None:
+                    self._on_whitelist(name)
+                whitelisted[0] = True
+                root.destroy()
+
+            tk.Button(
+                bottom_frame,
+                text="Add to whitelist",
+                bg=t["btn_bg"],
+                fg=t["btn_fg"],
+                activebackground=t["btn_active"],
+                relief="flat",
+                font=("Segoe UI", 9),
+                command=_add_to_whitelist,
+            ).pack(side="left", padx=4)
+
         # Ignore button
         tk.Button(
-            root,
+            bottom_frame,
             text="Ignore",
             bg=t["bg"],
             fg=t["muted"],
@@ -266,9 +301,14 @@ class SortPrompt:
             relief="flat",
             font=("Segoe UI", 9),
             command=root.destroy,
-        ).pack(pady=(0, 8))
+        ).pack(side="left", padx=4)
 
         root.mainloop()
+
+        # If whitelisted, skip callback — file stays in place
+        if whitelisted[0]:
+            self._on_done(self._filepath, None, False)
+            return
 
         # If user renamed the file, apply the rename before callback
         new_name = rename_var.get().strip()

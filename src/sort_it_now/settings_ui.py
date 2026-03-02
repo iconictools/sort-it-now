@@ -182,6 +182,24 @@ class SettingsDialog:
         ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
         row += 1
 
+        # -- Catch folders --
+        tk.Label(
+            frame, text="Catch folders:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        catch_folders_var = tk.BooleanVar(
+            value=self._config.get_setting("catch_folders", False)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Enabled",
+            variable=catch_folders_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
         # -- Monitored folders section --
         tk.Label(
             frame, text="Monitored folders:", bg=t["bg"], fg=t["fg"],
@@ -325,6 +343,7 @@ class SettingsDialog:
                 "batch_mode_style": batch_var.get(),
                 "pause_on_dnd": dnd_var.get(),
                 "scan_existing_enabled": scan_var.get(),
+                "catch_folders": catch_folders_var.get(),
             })
             set_autostart(autostart_var.get())
             logger.info("Settings saved.")

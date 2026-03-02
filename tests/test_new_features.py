@@ -462,3 +462,82 @@ class TestNotifications:
         from sort_it_now.notifications import notify
         # Should not raise even if plyer fails
         notify("Test", "Message", timeout=1)
+
+
+class TestCatchFolders:
+    """Tests for the catch_folders option in FolderWatcher."""
+
+    def test_watcher_accepts_catch_folders(self):
+        from sort_it_now.watcher import FolderWatcher
+
+        w = FolderWatcher(callback=lambda p: None, catch_folders=True)
+        assert w._catch_folders is True
+
+    def test_watcher_default_no_catch_folders(self):
+        from sort_it_now.watcher import FolderWatcher
+
+        w = FolderWatcher(callback=lambda p: None)
+        assert w._catch_folders is False
+
+    def test_scan_existing_includes_dirs_when_enabled(self):
+        from sort_it_now.watcher import FolderWatcher
+
+        tmpdir = tempfile.mkdtemp()
+        try:
+            # Create a file and a subdirectory
+            open(os.path.join(tmpdir, "file.txt"), "w").close()
+            os.makedirs(os.path.join(tmpdir, "subdir"))
+
+            collected: list[str] = []
+            w = FolderWatcher(callback=lambda p: None, catch_folders=True)
+            w.scan_existing(tmpdir, collected.append)
+            basenames = [os.path.basename(p) for p in collected]
+            assert "file.txt" in basenames
+            assert "subdir" in basenames
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_scan_existing_skips_dirs_when_disabled(self):
+        from sort_it_now.watcher import FolderWatcher
+
+        tmpdir = tempfile.mkdtemp()
+        try:
+            open(os.path.join(tmpdir, "file.txt"), "w").close()
+            os.makedirs(os.path.join(tmpdir, "subdir"))
+
+            collected: list[str] = []
+            w = FolderWatcher(callback=lambda p: None, catch_folders=False)
+            w.scan_existing(tmpdir, collected.append)
+            basenames = [os.path.basename(p) for p in collected]
+            assert "file.txt" in basenames
+            assert "subdir" not in basenames
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class TestSortPromptWhitelist:
+    """Tests for the on_whitelist parameter in SortPrompt."""
+
+    @skip_no_tkinter
+    def test_sort_prompt_accepts_whitelist_callback(self):
+        from sort_it_now.prompt import SortPrompt
+
+        called: list[str] = []
+        prompt = SortPrompt(
+            filepath="/tmp/test.txt",
+            destinations=["/tmp/dest"],
+            on_done=lambda *a: None,
+            on_whitelist=called.append,
+        )
+        assert prompt._on_whitelist is not None
+
+    @skip_no_tkinter
+    def test_sort_prompt_works_without_whitelist(self):
+        from sort_it_now.prompt import SortPrompt
+
+        prompt = SortPrompt(
+            filepath="/tmp/test.txt",
+            destinations=["/tmp/dest"],
+            on_done=lambda *a: None,
+        )
+        assert prompt._on_whitelist is None
