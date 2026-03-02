@@ -52,7 +52,7 @@ class SortPrompt:
         root.resizable(False, False)
 
         # Center on screen
-        w, h = 420, 420
+        w, h = 420, 540
         sx = root.winfo_screenwidth() // 2 - w // 2
         sy = root.winfo_screenheight() // 2 - h // 2
         root.geometry(f"{w}x{h}+{sx}+{sy}")
@@ -94,7 +94,88 @@ class SortPrompt:
                 bg=t["bg"],
                 fg=t["muted"],
                 font=("Segoe UI", 9),
-            ).pack(pady=(0, 8))
+            ).pack(pady=(0, 4))
+
+        # -- File preview --
+        _, ext_lower = os.path.splitext(self._filepath)
+        ext_lower = ext_lower.lower()
+        _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+        _TEXT_EXTS = {
+            ".txt", ".md", ".py", ".js", ".json", ".xml", ".csv", ".log",
+        }
+        _TYPE_LABELS = {
+            ".pdf": "PDF Document",
+            ".zip": "ZIP Archive",
+            ".rar": "RAR Archive",
+            ".7z": "7z Archive",
+            ".doc": "Word Document",
+            ".docx": "Word Document",
+            ".xls": "Excel Spreadsheet",
+            ".xlsx": "Excel Spreadsheet",
+            ".mp4": "Video File",
+            ".mp3": "Audio File",
+            ".exe": "Executable",
+        }
+
+        if ext_lower in _IMAGE_EXTS:
+            try:
+                from PIL import Image, ImageTk
+
+                img = Image.open(self._filepath)
+                img.thumbnail((120, 120))
+                photo = ImageTk.PhotoImage(img)
+                lbl = tk.Label(root, image=photo, bg=t["bg"])
+                lbl.image = photo  # type: ignore[attr-defined]
+                lbl.pack(pady=(0, 4))
+            except Exception:
+                pass
+        elif ext_lower in _TEXT_EXTS:
+            try:
+                with open(self._filepath, "r", encoding="utf-8",
+                          errors="replace") as fh:
+                    lines = []
+                    for _ in range(3):
+                        line = fh.readline()
+                        if not line:
+                            break
+                        lines.append(line.rstrip())
+                if lines:
+                    preview_text = "\n".join(lines)
+                    tk.Label(
+                        root,
+                        text=preview_text,
+                        bg=t["list_bg"],
+                        fg=t["list_fg"],
+                        font=("Consolas", 8),
+                        justify="left",
+                        anchor="w",
+                        wraplength=380,
+                    ).pack(pady=(0, 4), padx=24, fill="x")
+            except Exception:
+                pass
+        elif ext_lower in _TYPE_LABELS:
+            tk.Label(
+                root,
+                text=_TYPE_LABELS[ext_lower],
+                bg=t["bg"],
+                fg=t["muted"],
+                font=("Segoe UI", 9),
+            ).pack(pady=(0, 4))
+
+        # -- Rename field --
+        rename_frame = tk.Frame(root, bg=t["bg"])
+        rename_frame.pack(fill="x", padx=24, pady=(0, 4))
+        tk.Label(
+            rename_frame, text="Name:",
+            bg=t["bg"], fg=t["fg"], font=("Segoe UI", 9),
+        ).pack(side="left")
+        rename_var = tk.StringVar(value=basename)
+        rename_entry = tk.Entry(
+            rename_frame, textvariable=rename_var,
+            bg=t["entry_bg"], fg=t["entry_fg"], font=("Segoe UI", 9),
+        )
+        rename_entry.pack(side="left", fill="x", expand=True, padx=(4, 0))
+
         tk.Label(
             root,
             text="Where should it go?",
@@ -188,6 +269,19 @@ class SortPrompt:
         ).pack(pady=(0, 8))
 
         root.mainloop()
+
+        # If user renamed the file, apply the rename before callback
+        new_name = rename_var.get().strip()
+        if new_name and new_name != basename and os.path.exists(self._filepath):
+            new_path = os.path.join(
+                os.path.dirname(self._filepath), new_name
+            )
+            try:
+                os.rename(self._filepath, new_path)
+                self._filepath = new_path
+            except OSError:
+                pass
+
         self._on_done(self._filepath, chosen[0], always_var.get())
 
 

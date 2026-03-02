@@ -6,9 +6,11 @@ files the user has previously classified.
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
 import os
+import re
 import shutil
 import time
 from collections import Counter
@@ -51,9 +53,12 @@ class Rules:
             self._data = {"extension_map": {}, "history": []}
 
     def save(self) -> None:
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w", encoding="utf-8") as fh:
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        tmp_path = self.path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as fh:
             json.dump(self._data, fh, indent=2)
+        os.replace(tmp_path, self.path)
 
     # ------------------------------------------------------------------
     # Rule management
@@ -111,3 +116,56 @@ class Rules:
         """Return the auto-learned destination for *filepath*, or *None*."""
         _, ext = os.path.splitext(filepath)
         return self.extension_map.get(ext.lower())
+
+    # ------------------------------------------------------------------
+    # Pattern rules (glob / regex)
+    # ------------------------------------------------------------------
+
+    @property
+    def pattern_rules(self) -> list[dict[str, str]]:
+        """Return the list of pattern rule dicts."""
+        return self._data.get("pattern_rules", [])
+
+    def set_pattern_rule(self, pattern: str, destination: str,
+                         pattern_type: str = "glob") -> None:
+        """Add or update a pattern rule."""
+        rules = self._data.setdefault("pattern_rules", [])
+        # Update existing rule with same pattern
+        for rule in rules:
+            if rule["pattern"] == pattern:
+                rule["destination"] = destination
+                rule["type"] = pattern_type
+                self.save()
+                return
+        rules.append({
+            "pattern": pattern,
+            "destination": destination,
+            "type": pattern_type,
+        })
+        self.save()
+
+    def remove_pattern_rule(self, pattern: str) -> None:
+        """Remove a pattern rule by its pattern string."""
+        rules = self._data.get("pattern_rules", [])
+        self._data["pattern_rules"] = [
+            r for r in rules if r["pattern"] != pattern
+        ]
+        self.save()
+
+    def get_pattern_destination(self, filepath: str) -> str | None:
+        """Return the destination for *filepath* based on pattern rules."""
+        basename = os.path.basename(filepath)
+        for rule in self.pattern_rules:
+            pattern = rule["pattern"]
+            pat_type = rule.get("type", "glob")
+            try:
+                if pat_type == "regex":
+                    if re.match(pattern, basename):
+                        return rule["destination"]
+                else:
+                    if fnmatch.fnmatch(basename, pattern):
+                        return rule["destination"]
+            except re.error:
+                logger.warning("Invalid regex pattern: %s", pattern)
+                continue
+        return None

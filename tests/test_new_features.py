@@ -200,3 +200,265 @@ class TestModuleImports:
     def test_import_prompt_cli_setup(self):
         from sort_it_now.prompt import cli_setup
         assert callable(cli_setup)
+
+
+class TestDashboardUI:
+    """Test that dashboard_ui functions are importable."""
+
+    @skip_no_tkinter
+    def test_show_dashboard_exists(self):
+        from sort_it_now.dashboard_ui import show_dashboard
+        assert callable(show_dashboard)
+
+    @skip_no_tkinter
+    def test_show_batch_list_exists(self):
+        from sort_it_now.dashboard_ui import show_batch_list
+        assert callable(show_batch_list)
+
+
+class TestPatternRules:
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+        self._rules_file = os.path.join(self._tmpdir, "rules.json")
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_set_and_get_pattern_rule(self):
+        from sort_it_now.rules import Rules
+        r = Rules(self._rules_file)
+        r.set_pattern_rule("*.pdf", "/dest/docs", "glob")
+        assert len(r.pattern_rules) == 1
+        assert r.pattern_rules[0]["pattern"] == "*.pdf"
+
+    def test_remove_pattern_rule(self):
+        from sort_it_now.rules import Rules
+        r = Rules(self._rules_file)
+        r.set_pattern_rule("*.pdf", "/dest/docs", "glob")
+        r.remove_pattern_rule("*.pdf")
+        assert len(r.pattern_rules) == 0
+
+    def test_get_pattern_destination_glob(self):
+        from sort_it_now.rules import Rules
+        r = Rules(self._rules_file)
+        r.set_pattern_rule("invoice*.pdf", "/dest/invoices", "glob")
+        result = r.get_pattern_destination("/tmp/invoice_2024.pdf")
+        assert result == "/dest/invoices"
+
+    def test_get_pattern_destination_regex(self):
+        from sort_it_now.rules import Rules
+        r = Rules(self._rules_file)
+        r.set_pattern_rule(r"report_\d+\.csv", "/dest/reports", "regex")
+        result = r.get_pattern_destination("/tmp/report_123.csv")
+        assert result == "/dest/reports"
+
+    def test_get_pattern_destination_no_match(self):
+        from sort_it_now.rules import Rules
+        r = Rules(self._rules_file)
+        r.set_pattern_rule("*.pdf", "/dest/docs", "glob")
+        result = r.get_pattern_destination("/tmp/file.txt")
+        assert result is None
+
+
+class TestAtomicSave:
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_config_save_creates_valid_file(self):
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.set_setting("test_key", "test_value")
+        # File should exist and be valid JSON
+        import json
+        with open(path, "r") as f:
+            data = json.load(f)
+        assert data["global_settings"]["test_key"] == "test_value"
+
+    def test_config_save_no_tmp_leftover(self):
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.set_setting("key", "val")
+        assert not os.path.exists(path + ".tmp")
+
+    def test_rules_save_creates_valid_file(self):
+        from sort_it_now.rules import Rules
+        path = os.path.join(self._tmpdir, "rules.json")
+        r = Rules(path)
+        r.set_rule(".txt", "/dest")
+        import json
+        with open(path, "r") as f:
+            data = json.load(f)
+        assert ".txt" in data["extension_map"]
+
+
+class TestDuplicateDetection:
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_compute_file_hash(self):
+        from sort_it_now.duplicate import compute_file_hash
+        path = os.path.join(self._tmpdir, "test.txt")
+        with open(path, "w") as f:
+            f.write("hello world")
+        h = compute_file_hash(path)
+        assert isinstance(h, str)
+        assert len(h) == 64  # sha256 hex digest length
+
+    def test_find_duplicate_found(self):
+        from sort_it_now.duplicate import find_duplicate
+        src = os.path.join(self._tmpdir, "src.txt")
+        dest_dir = os.path.join(self._tmpdir, "dest")
+        os.makedirs(dest_dir)
+        content = "duplicate content"
+        with open(src, "w") as f:
+            f.write(content)
+        dup = os.path.join(dest_dir, "existing.txt")
+        with open(dup, "w") as f:
+            f.write(content)
+        result = find_duplicate(src, dest_dir)
+        assert result == dup
+
+    def test_find_duplicate_not_found(self):
+        from sort_it_now.duplicate import find_duplicate
+        src = os.path.join(self._tmpdir, "src.txt")
+        dest_dir = os.path.join(self._tmpdir, "dest")
+        os.makedirs(dest_dir)
+        with open(src, "w") as f:
+            f.write("unique content")
+        with open(os.path.join(dest_dir, "other.txt"), "w") as f:
+            f.write("different content")
+        result = find_duplicate(src, dest_dir)
+        assert result is None
+
+
+class TestWhitelist:
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_add_and_get_whitelist(self):
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.add_to_whitelist("*.log")
+        assert "*.log" in c.get_whitelist()
+
+    def test_remove_from_whitelist(self):
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.add_to_whitelist("*.log")
+        c.remove_from_whitelist("*.log")
+        assert "*.log" not in c.get_whitelist()
+
+    def test_whitelist_no_duplicates(self):
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.add_to_whitelist("*.log")
+        c.add_to_whitelist("*.log")
+        assert c.get_whitelist().count("*.log") == 1
+
+
+class TestRenamePattern:
+    @skip_no_tkinter
+    def test_apply_rename_pattern_with_date_and_name(self):
+        import datetime
+        from sort_it_now.app import _apply_rename_pattern
+        result = _apply_rename_pattern("/tmp/report.pdf", "{date}_{name}")
+        today = datetime.date.today().isoformat()
+        assert result == f"{today}_report.pdf"
+
+    @skip_no_tkinter
+    def test_apply_rename_pattern_preserves_ext(self):
+        from sort_it_now.app import _apply_rename_pattern
+        result = _apply_rename_pattern("/tmp/file.txt", "{name}_copy")
+        assert result.endswith(".txt")
+
+    @skip_no_tkinter
+    def test_apply_rename_pattern_with_ext_token(self):
+        from sort_it_now.app import _apply_rename_pattern
+        result = _apply_rename_pattern("/tmp/data.csv", "{name}{ext}")
+        assert result == "data.csv"
+
+
+class TestConfigExportImport:
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_export_import_roundtrip(self):
+        from sort_it_now.config import Config
+        from sort_it_now.rules import Rules
+
+        config_path = os.path.join(self._tmpdir, "config.json")
+        rules_path = os.path.join(self._tmpdir, "rules.json")
+        export_path = os.path.join(self._tmpdir, "backup.zip")
+
+        c = Config(config_path)
+        c.set_setting("theme", "light")
+        r = Rules(rules_path)
+        r.set_rule(".txt", "/dest/text")
+
+        c.export_config(export_path)
+        assert os.path.exists(export_path)
+
+        # Modify and re-import
+        c.set_setting("theme", "dark")
+        c.import_config(export_path)
+        assert c.get_setting("theme") == "light"
+
+
+class TestConfigSaveMany:
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_save_many_batches_writes(self):
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.save_many({
+            "theme": "light",
+            "auto_learn": False,
+            "auto_learn_threshold": 5,
+        })
+        assert c.get_setting("theme") == "light"
+        assert c.get_setting("auto_learn") is False
+        assert c.get_setting("auto_learn_threshold") == 5
+
+    def test_save_many_persists_to_disk(self):
+        import json
+        from sort_it_now.config import Config
+        path = os.path.join(self._tmpdir, "config.json")
+        c = Config(path)
+        c.save_many({"key1": "val1", "key2": "val2"})
+        with open(path, "r") as f:
+            data = json.load(f)
+        assert data["global_settings"]["key1"] == "val1"
+        assert data["global_settings"]["key2"] == "val2"
+
+
+class TestNotifications:
+    def test_notify_function_exists(self):
+        from sort_it_now.notifications import notify
+        assert callable(notify)
+
+    def test_notify_does_not_crash(self):
+        from sort_it_now.notifications import notify
+        # Should not raise even if plyer fails
+        notify("Test", "Message", timeout=1)

@@ -10,6 +10,7 @@ import logging
 import os
 import shutil
 import time
+import zipfile
 from typing import Any
 
 from sort_it_now.constants import DEFAULT_CONFIG_FILE
@@ -77,10 +78,13 @@ class Config:
             self.save()
 
     def save(self) -> None:
-        """Persist current configuration to disk."""
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(self.path, "w", encoding="utf-8") as fh:
+        """Persist current configuration to disk (atomic write)."""
+        dir_path = os.path.dirname(self.path) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        tmp_path = self.path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as fh:
             json.dump(self._data, fh, indent=2)
+        os.replace(tmp_path, self.path)
 
     # ------------------------------------------------------------------
     # Monitored folders
@@ -127,6 +131,12 @@ class Config:
         self._data.setdefault("global_settings", {})[key] = value
         self.save()
 
+    def save_many(self, settings: dict[str, Any]) -> None:
+        """Batch-update multiple settings in a single disk write."""
+        gs = self._data.setdefault("global_settings", {})
+        gs.update(settings)
+        self.save()
+
     # ------------------------------------------------------------------
     # Ignore patterns
     # ------------------------------------------------------------------
@@ -146,3 +156,68 @@ class Config:
         if pattern in patterns:
             patterns.remove(pattern)
             self.save()
+
+    # ------------------------------------------------------------------
+    # Whitelist
+    # ------------------------------------------------------------------
+
+    def get_whitelist(self) -> list[str]:
+        """Return the list of whitelist glob patterns."""
+        return self._data.get("whitelist", [])
+
+    def add_to_whitelist(self, pattern: str) -> None:
+        """Add a glob pattern to the whitelist."""
+        wl = self._data.setdefault("whitelist", [])
+        if pattern not in wl:
+            wl.append(pattern)
+            self.save()
+
+    def remove_from_whitelist(self, pattern: str) -> None:
+        """Remove a glob pattern from the whitelist."""
+        wl = self._data.get("whitelist", [])
+        if pattern in wl:
+            wl.remove(pattern)
+            self.save()
+
+    # ------------------------------------------------------------------
+    # Rename patterns
+    # ------------------------------------------------------------------
+
+    @property
+    def rename_patterns(self) -> list[dict[str, Any]]:
+        """Return the list of rename pattern dicts."""
+        return self._data.get("rename_patterns", [])
+
+    def get_rename_pattern(self, ext: str) -> str | None:
+        """Return the rename pattern string for *ext*, or *None*."""
+        ext = ext.lower()
+        for entry in self.rename_patterns:
+            if not entry.get("enabled", True):
+                continue
+            if ext in entry.get("extensions", []):
+                return entry.get("pattern")
+        return None
+
+    # ------------------------------------------------------------------
+    # Import / Export
+    # ------------------------------------------------------------------
+
+    def export_config(self, export_path: str) -> None:
+        """Export config.json and rules.json into a zip file."""
+        rules_path = os.path.join(
+            os.path.dirname(self.path) or ".", "rules.json"
+        )
+        with zipfile.ZipFile(export_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            if os.path.exists(self.path):
+                zf.write(self.path, "config.json")
+            if os.path.exists(rules_path):
+                zf.write(rules_path, "rules.json")
+
+    def import_config(self, import_path: str) -> None:
+        """Import config.json and rules.json from a zip file."""
+        dest_dir = os.path.dirname(self.path) or "."
+        with zipfile.ZipFile(import_path, "r") as zf:
+            for name in ("config.json", "rules.json"):
+                if name in zf.namelist():
+                    zf.extract(name, dest_dir)
+        self.load()

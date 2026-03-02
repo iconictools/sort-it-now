@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
 from sort_it_now.autostart import is_autostart_enabled, set_autostart
@@ -34,7 +34,7 @@ class SettingsDialog:
         root.configure(bg=t["bg"])
         root.resizable(False, False)
 
-        w, h = 480, 520
+        w, h = 480, 700
         sx = root.winfo_screenwidth() // 2 - w // 2
         sy = root.winfo_screenheight() // 2 - h // 2
         root.geometry(f"{w}x{h}+{sx}+{sy}")
@@ -164,6 +164,24 @@ class SettingsDialog:
         ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
         row += 1
 
+        # -- Scan existing files --
+        tk.Label(
+            frame, text="Scan existing files:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=4)
+        scan_var = tk.BooleanVar(
+            value=self._config.get_setting("scan_existing_enabled", False)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Enabled",
+            variable=scan_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
+        row += 1
+
         # -- Monitored folders section --
         tk.Label(
             frame, text="Monitored folders:", bg=t["bg"], fg=t["fg"],
@@ -225,28 +243,95 @@ class SettingsDialog:
         ).pack(side="left")
         row += 1
 
+        # -- Whitelist patterns section --
+        tk.Label(
+            frame, text="Whitelist patterns:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10, "bold"),
+        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(12, 4))
+        row += 1
+
+        wl_list = tk.Listbox(
+            frame, bg=t["list_bg"], fg=t["list_fg"],
+            selectbackground=t["list_select_bg"],
+            selectforeground=t["list_select_fg"],
+            font=("Segoe UI", 9), height=3, relief="flat",
+        )
+        wl_list.grid(row=row, column=0, columnspan=2, sticky="ew", pady=4)
+        for pat in self._config.get_whitelist():
+            wl_list.insert("end", pat)
+        row += 1
+
+        wl_btn_frame = tk.Frame(frame, bg=t["bg"])
+        wl_btn_frame.grid(
+            row=row, column=0, columnspan=2, sticky="ew", pady=2,
+        )
+
+        def _add_whitelist() -> None:
+            dlg = tk.Toplevel(root)
+            dlg.title("Add Whitelist Pattern")
+            dlg.configure(bg=t["bg"])
+            dlg.geometry("300x120")
+            tk.Label(
+                dlg, text="Pattern (e.g. *.log):", bg=t["bg"], fg=t["fg"],
+                font=("Segoe UI", 10),
+            ).pack(pady=(12, 2))
+            entry = tk.Entry(
+                dlg, bg=t["entry_bg"], fg=t["entry_fg"],
+                font=("Segoe UI", 10),
+            )
+            entry.pack(padx=20, fill="x")
+
+            def _save_wl() -> None:
+                pat = entry.get().strip()
+                if pat:
+                    self._config.add_to_whitelist(pat)
+                    wl_list.insert("end", pat)
+                dlg.destroy()
+
+            tk.Button(
+                dlg, text="Add", bg=t["accent"], fg=t["bg"],
+                font=("Segoe UI", 10, "bold"), relief="flat",
+                command=_save_wl,
+            ).pack(pady=8)
+
+        def _remove_whitelist() -> None:
+            sel = wl_list.curselection()
+            if sel:
+                pat = wl_list.get(sel[0])
+                self._config.remove_from_whitelist(pat)
+                wl_list.delete(sel[0])
+
+        tk.Button(
+            wl_btn_frame, text="+ Add", bg=t["accent"], fg=t["bg"],
+            font=("Segoe UI", 9, "bold"), relief="flat",
+            command=_add_whitelist,
+        ).pack(side="left", padx=(0, 4))
+        tk.Button(
+            wl_btn_frame, text="- Remove", bg=t["danger"], fg="#ffffff",
+            font=("Segoe UI", 9, "bold"), relief="flat",
+            command=_remove_whitelist,
+        ).pack(side="left")
+        row += 1
+
         frame.columnconfigure(1, weight=1)
 
         # -- Save / Cancel --
         def _save() -> None:
-            self._config.set_setting("theme", theme_var.get())
-            self._config.set_setting("auto_learn", auto_learn_var.get())
-            self._config.set_setting(
-                "auto_learn_threshold", threshold_var.get()
-            )
-            self._config.set_setting(
-                "prompt_delay_seconds", delay_var.get()
-            )
-            self._config.set_setting(
-                "batch_mode_style", batch_var.get()
-            )
-            self._config.set_setting("pause_on_dnd", dnd_var.get())
+            self._config.save_many({
+                "theme": theme_var.get(),
+                "auto_learn": auto_learn_var.get(),
+                "auto_learn_threshold": threshold_var.get(),
+                "prompt_delay_seconds": delay_var.get(),
+                "batch_mode_style": batch_var.get(),
+                "pause_on_dnd": dnd_var.get(),
+                "scan_existing_enabled": scan_var.get(),
+            })
             set_autostart(autostart_var.get())
             logger.info("Settings saved.")
             root.destroy()
 
         btn_row = tk.Frame(root, bg=t["bg"])
-        btn_row.pack(pady=12)
+        btn_row.pack(pady=8)
         tk.Button(
             btn_row, text="Save", bg=t["accent"], fg=t["bg"],
             font=("Segoe UI", 10, "bold"), relief="flat", command=_save,
@@ -256,6 +341,43 @@ class SettingsDialog:
             btn_row, text="Cancel", bg=t["btn_bg"], fg=t["btn_fg"],
             font=("Segoe UI", 10), relief="flat", command=root.destroy,
             width=10,
+        ).pack(side="left", padx=4)
+
+        # -- Export / Import --
+        io_frame = tk.Frame(root, bg=t["bg"])
+        io_frame.pack(pady=(0, 12))
+
+        def _export_config() -> None:
+            path = filedialog.asksaveasfilename(
+                title="Export Config",
+                defaultextension=".zip",
+                filetypes=[("Zip files", "*.zip")],
+                parent=root,
+            )
+            if path:
+                self._config.export_config(path)
+                messagebox.showinfo("Export", "Config exported.", parent=root)
+
+        def _import_config() -> None:
+            path = filedialog.askopenfilename(
+                title="Import Config",
+                filetypes=[("Zip files", "*.zip")],
+                parent=root,
+            )
+            if path:
+                self._config.import_config(path)
+                messagebox.showinfo(
+                    "Import", "Config imported. Restart to apply.",
+                    parent=root,
+                )
+
+        tk.Button(
+            io_frame, text="Export Config", bg=t["btn_bg"], fg=t["btn_fg"],
+            font=("Segoe UI", 9), relief="flat", command=_export_config,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            io_frame, text="Import Config", bg=t["btn_bg"], fg=t["btn_fg"],
+            font=("Segoe UI", 9), relief="flat", command=_import_config,
         ).pack(side="left", padx=4)
 
         root.mainloop()

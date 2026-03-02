@@ -6,6 +6,7 @@ Implements smart delay to wait for downloads to finish before prompting.
 
 from __future__ import annotations
 
+import fnmatch as fnmatch_mod
 import logging
 import os
 import time
@@ -157,3 +158,33 @@ class FolderWatcher:
         self._observer.stop()
         self._observer.join(timeout=5)
         logger.info("Watcher stopped")
+
+    def scan_existing(
+        self,
+        folder: str,
+        callback: Callable[[str], None],
+        whitelist: list[str] | None = None,
+    ) -> None:
+        """Scan *folder* for existing files and call *callback* for each.
+
+        Respects ignore patterns and optional *whitelist* patterns.
+        """
+        folder = os.path.abspath(folder)
+        wl = whitelist or []
+        for entry in os.scandir(folder):
+            if not entry.is_file():
+                continue
+            basename = entry.name
+            if matches_ignore_pattern(basename, self._ignore_patterns):
+                continue
+            if is_temp_file(entry.path):
+                continue
+            # Skip whitelisted files
+            skip = False
+            for pat in wl:
+                if fnmatch_mod.fnmatch(basename, pat):
+                    skip = True
+                    break
+            if skip:
+                continue
+            callback(entry.path)

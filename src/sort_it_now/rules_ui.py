@@ -35,7 +35,7 @@ class RulesDialog:
         root.configure(bg=t["bg"])
         root.resizable(False, False)
 
-        w, h = 520, 440
+        w, h = 520, 640
         sx = root.winfo_screenwidth() // 2 - w // 2
         sy = root.winfo_screenheight() // 2 - h // 2
         root.geometry(f"{w}x{h}+{sx}+{sy}")
@@ -162,5 +162,122 @@ class RulesDialog:
             font=("Segoe UI", 10), relief="flat", command=root.destroy,
             width=10,
         ).pack(pady=(0, 12))
+
+        # -- Pattern Rules Section --
+        tk.Label(
+            root, text="Pattern Rules (glob/regex):",
+            bg=t["bg"], fg=t["accent"],
+            font=("Segoe UI", 12, "bold"),
+        ).pack(pady=(4, 4), padx=24, anchor="w")
+
+        pat_frame = tk.Frame(root, bg=t["bg"])
+        pat_frame.pack(fill="both", expand=True, padx=24, pady=4)
+
+        pat_scrollbar = tk.Scrollbar(pat_frame)
+        pat_scrollbar.pack(side="right", fill="y")
+
+        pat_listbox = tk.Listbox(
+            pat_frame,
+            bg=t["list_bg"], fg=t["list_fg"],
+            selectbackground=t["list_select_bg"],
+            selectforeground=t["list_select_fg"],
+            font=("Segoe UI", 10), relief="flat",
+            yscrollcommand=pat_scrollbar.set,
+        )
+        pat_listbox.pack(fill="both", expand=True)
+        pat_scrollbar.config(command=pat_listbox.yview)
+
+        def _refresh_patterns() -> None:
+            pat_listbox.delete(0, "end")
+            for rule in self._rules.pattern_rules:
+                dest_name = os.path.basename(rule["destination"])
+                pat_listbox.insert(
+                    "end",
+                    f"[{rule.get('type', 'glob')}]  "
+                    f"{rule['pattern']}  ->  {dest_name}",
+                )
+
+        _refresh_patterns()
+
+        pat_btn_frame = tk.Frame(root, bg=t["bg"])
+        pat_btn_frame.pack(pady=4)
+
+        def _add_pattern_rule() -> None:
+            dlg = tk.Toplevel(root)
+            dlg.title("Add Pattern Rule")
+            dlg.configure(bg=t["bg"])
+            dlg.geometry("360x220")
+            dlg.attributes("-topmost", True)
+
+            tk.Label(
+                dlg, text="Pattern (e.g. invoice*.pdf):",
+                bg=t["bg"], fg=t["fg"], font=("Segoe UI", 10),
+            ).pack(pady=(12, 2))
+            pat_entry = tk.Entry(
+                dlg, bg=t["entry_bg"], fg=t["entry_fg"],
+                font=("Segoe UI", 10),
+            )
+            pat_entry.pack(padx=20, fill="x")
+
+            tk.Label(
+                dlg, text="Type:", bg=t["bg"], fg=t["fg"],
+                font=("Segoe UI", 10),
+            ).pack(pady=(8, 2))
+            type_var = tk.StringVar(value="glob")
+            type_menu = tk.OptionMenu(dlg, type_var, "glob", "regex")
+            type_menu.config(
+                bg=t["btn_bg"], fg=t["btn_fg"], font=("Segoe UI", 10),
+                relief="flat",
+            )
+            type_menu.pack()
+
+            def _pick_dest() -> None:
+                pat = pat_entry.get().strip()
+                if not pat:
+                    return
+                dest = filedialog.askdirectory(
+                    title=f"Destination for {pat}", parent=dlg
+                )
+                if dest:
+                    self._rules.set_pattern_rule(
+                        pat, dest, type_var.get()
+                    )
+                    _refresh_patterns()
+                    dlg.destroy()
+
+            tk.Button(
+                dlg, text="Choose destination...",
+                bg=t["accent"], fg=t["bg"],
+                font=("Segoe UI", 10, "bold"), relief="flat",
+                command=_pick_dest,
+            ).pack(pady=12)
+
+        def _delete_pattern_rule() -> None:
+            sel = pat_listbox.curselection()
+            if not sel:
+                return
+            rules = self._rules.pattern_rules
+            if sel[0] < len(rules):
+                pattern = rules[sel[0]]["pattern"]
+                if messagebox.askyesno(
+                    "Delete pattern rule",
+                    f"Remove the rule for '{pattern}'?",
+                    parent=root,
+                ):
+                    self._rules.remove_pattern_rule(pattern)
+                    _refresh_patterns()
+
+        tk.Button(
+            pat_btn_frame, text="+ Add Pattern",
+            bg=t["accent"], fg=t["bg"],
+            font=("Segoe UI", 10, "bold"), relief="flat",
+            command=_add_pattern_rule, width=12,
+        ).pack(side="left", padx=4)
+        tk.Button(
+            pat_btn_frame, text="Delete Pattern",
+            bg=t["danger"], fg="#ffffff",
+            font=("Segoe UI", 10, "bold"), relief="flat",
+            command=_delete_pattern_rule, width=12,
+        ).pack(side="left", padx=4)
 
         root.mainloop()
