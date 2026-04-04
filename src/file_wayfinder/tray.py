@@ -76,6 +76,8 @@ class TrayIcon:
         Called when the user clicks "Settings".
     on_open_rules:
         Called when the user clicks "Manage Rules".
+    on_add_folder:
+        Called when the user clicks "Add folder to watch...".
     on_quit:
         Called when the user clicks "Quit".
     """
@@ -87,6 +89,7 @@ class TrayIcon:
         on_undo: Callable[[], None] | None = None,
         on_open_settings: Callable[[], None] | None = None,
         on_open_rules: Callable[[], None] | None = None,
+        on_add_folder: Callable[[], None] | None = None,
         on_quit: Callable[[], None] | None = None,
     ) -> None:
         self._on_dashboard = on_open_dashboard or (lambda: None)
@@ -94,14 +97,18 @@ class TrayIcon:
         self._on_undo = on_undo or (lambda: None)
         self._on_settings = on_open_settings or (lambda: None)
         self._on_rules = on_open_rules or (lambda: None)
+        self._on_add_folder = on_add_folder or (lambda: None)
         self._on_quit = on_quit or (lambda: None)
         self._icon: pystray.Icon | None = None
         self._pending = False
         self._pending_count = 0
+        self._monitored_count = 0
 
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
             pystray.MenuItem("Dashboard", lambda: self._on_dashboard()),
+            pystray.MenuItem("Add folder to watch...", lambda: self._on_add_folder()),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Undo last", lambda: self._on_undo()),
             pystray.MenuItem(
                 "Focus mode",
@@ -145,7 +152,22 @@ class TrayIcon:
                 self._icon.icon = _icon_pending(count)
                 self._icon.title = f"File Wayfinder ({count} pending)"
             else:
-                self._icon.icon = _icon_idle()
+                self._refresh_idle_icon()
+
+    def set_monitored_count(self, count: int) -> None:
+        """Update the tray tooltip to show how many folders are being monitored."""
+        self._monitored_count = count
+        if self._icon and not self._pending:
+            self._refresh_idle_icon()
+
+    def _refresh_idle_icon(self) -> None:
+        """Refresh the icon and title to reflect the monitored folder count."""
+        if self._icon:
+            self._icon.icon = _icon_idle()
+            n = self._monitored_count
+            if n > 0:
+                self._icon.title = f"File Wayfinder ({n} folder{'s' if n != 1 else ''} watched)"
+            else:
                 self._icon.title = "File Wayfinder"
 
     def stop(self) -> None:

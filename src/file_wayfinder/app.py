@@ -104,6 +104,7 @@ class App:
             on_undo=self._undo_last,
             on_open_settings=self._show_settings,
             on_open_rules=self._show_rules,
+            on_add_folder=self._add_folder_via_tray,
             on_quit=self._quit,
         )
 
@@ -155,12 +156,18 @@ class App:
                     )
 
         logger.info("File Wayfinder is running.")
+        self._update_tray_monitored_count()
         # Tray icon runs on the main thread (required by OS)
         try:
             self.tray.start()
         finally:
             self.watcher.stop()
             self.history.close()
+
+    def _update_tray_monitored_count(self) -> None:
+        """Update the tray tooltip to show how many folders are being monitored."""
+        count = len(self.config.monitored_folders)
+        self.tray.set_monitored_count(count)
 
     def _quit(self) -> None:
         logger.info("Shutting down...")
@@ -350,6 +357,131 @@ class App:
     # ------------------------------------------------------------------
     # Tray menu actions
     # ------------------------------------------------------------------
+
+    def _add_folder_via_tray(self) -> None:
+        """Handle 'Add folder to watch...' from the tray menu.
+
+        Opens a directory picker, then prompts the user whether to whitelist
+        all existing files in the folder or sort them now.  The folder is then
+        added to monitoring.
+        """
+        t = threading.Thread(target=self._add_folder_flow, daemon=True)
+        t.start()
+
+    def _add_folder_flow(self) -> None:
+        """Background thread: pick folder → configure destinations → start watching."""
+        import tkinter as tk
+        from tkinter import filedialog, messagebox, simpledialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+
+        folder = filedialog.askdirectory(
+            title="Choose a folder to watch",
+            parent=root,
+        )
+        if not folder or not os.path.isdir(folder):
+            root.destroy()
+            return
+
+        # Already monitored?
+        if folder in self.config.monitored_folders:
+            messagebox.showinfo(
+                "Already watched",
+                f"This folder is already being monitored:\n{folder}",
+                parent=root,
+            )
+            root.destroy()
+            return
+
+        # Pick initial destination folders for this monitored folder
+        dests: list[str] = []
+        messagebox.showinfo(
+            "Add destinations",
+            "Now choose one or more destination folders for files from:\n"
+            f"{folder}\n\n"
+            "You will be prompted to pick each destination. Click Cancel when done.",
+            parent=root,
+        )
+        while True:
+            dest = filedialog.askdirectory(
+                title=f"Destination folder for {os.path.basename(folder)} (Cancel to finish)",
+                parent=root,
+            )
+            if not dest:
+                break
+            if dest not in dests:
+                dests.append(dest)
+
+        if not dests:
+            messagebox.showwarning(
+                "No destinations",
+                "No destination folders were chosen — folder not added.",
+                parent=root,
+            )
+            root.destroy()
+            return
+
+        # Check for existing files
+        try:
+            existing = [
+                os.path.join(folder, f)
+                for f in os.listdir(folder)
+                if os.path.isfile(os.path.join(folder, f))
+                or (
+                    self.config.get_setting("catch_folders", False)
+                    and os.path.isdir(os.path.join(folder, f))
+                )
+            ]
+        except OSError:
+            existing = []
+
+        whitelist_existing = False
+        if existing:
+            answer = messagebox.askyesnocancel(
+                "Existing files found",
+                f"{len(existing)} item(s) already in {os.path.basename(folder)}.\n\n"
+                "Yes  — Add them all to the whitelist (ignore forever)\n"
+                "No   — Sort them now using the main sorting screen\n"
+                "Cancel — Abort",
+                parent=root,
+            )
+            if answer is None:
+                root.destroy()
+                return
+            whitelist_existing = bool(answer)
+
+        root.destroy()
+
+        # Persist configuration
+        self.config.add_monitored_folder(folder, dests)
+        if whitelist_existing:
+            for item in existing:
+                self.config.add_to_whitelist(os.path.basename(item))
+            logger.info(
+                "Whitelisted %d existing items in %s", len(existing), folder
+            )
+        else:
+            # Queue existing files for sorting
+            for item in existing:
+                with self._lock:
+                    self._batch_queue.append(item)
+            count = len(self._batch_queue)
+            self.tray.set_pending(True, count)
+
+        # Start watching the new folder
+        try:
+            self.watcher.add_folder(folder)
+        except Exception as exc:
+            logger.error("Cannot watch %s: %s", folder, exc)
+
+        self._update_tray_monitored_count()
+        logger.info("Added monitored folder: %s -> %s", folder, dests)
+
+        # If not whitelisted, open sorting screen immediately
+        if not whitelist_existing and existing:
+            self._process_batch_queue()
 
     def _toggle_focus(self) -> None:
         self._focus_mode = not self._focus_mode
