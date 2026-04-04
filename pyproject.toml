@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sort-it-now"
+name = "file-wayfinder"
 version = "0.1.0"
 description = "Tray-resident real-time file organizer assistant"
 readme = "README.md"
@@ -24,7 +24,7 @@ dev = [
 ]
 
 [project.scripts]
-sort-it-now = "sort_it_now.__main__:main"
+file-wayfinder = "file_wayfinder.__main__:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

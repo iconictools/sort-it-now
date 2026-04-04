@@ -69,11 +69,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: sort-it-now-linux
+            artifact: file-wayfinder-linux
           - os: windows-latest
-            artifact: sort-it-now-windows
+            artifact: file-wayfinder-windows
           - os: macos-latest
-            artifact: sort-it-now-macos
+            artifact: file-wayfinder-macos
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

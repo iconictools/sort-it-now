@@ -1,4 +1,4 @@
-"""Autostart on login management for Sort It Now.
+"""Autostart on login management for File Wayfinder.
 
 On Windows this uses the ``HKCU\\...\\Run`` registry key.
 On other platforms this is a no-op with a logged warning.
@@ -11,7 +11,7 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-_APP_NAME = "SortItNow"
+_APP_NAME = "FileWayfinder"
 
 
 def is_autostart_enabled() -> bool:
@@ -60,7 +60,7 @@ def set_autostart(enabled: bool) -> bool:
                 if getattr(sys, "frozen", False):
                     exe = sys.executable
                 else:
-                    exe = f'"{sys.executable}" -m sort_it_now'
+                    exe = f'"{sys.executable}" -m file_wayfinder'
                 winreg.SetValueEx(key, _APP_NAME, 0, winreg.REG_SZ, exe)
                 logger.info("Autostart enabled.")
             else:

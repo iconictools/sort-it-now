@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from sort_it_now.config import Config
+from file_wayfinder.config import Config
 
 
 class TestConfig:

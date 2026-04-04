@@ -1,4 +1,4 @@
-"""User prompt dialogs for Sort It Now (tkinter-based)."""
+"""User prompt dialogs for File Wayfinder (tkinter-based)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from typing import Callable
 
-from sort_it_now.themes import get_theme
+from file_wayfinder.themes import get_theme
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class SortPrompt:
         t = get_theme(self._theme_name)
 
         root = tk.Tk()
-        root.title("Sort It Now")
+        root.title("File Wayfinder")
         root.configure(bg=t["bg"])
         root.attributes("-topmost", True)
         root.resizable(False, False)
@@ -130,11 +130,14 @@ class SortPrompt:
                 from PIL import Image, ImageTk
 
                 img = Image.open(self._filepath)
-                img.thumbnail((120, 120))
-                photo = ImageTk.PhotoImage(img)
-                lbl = tk.Label(root, image=photo, bg=t["bg"])
-                lbl.image = photo  # type: ignore[attr-defined]
-                lbl.pack(pady=(0, 4))
+                try:
+                    img.thumbnail((120, 120))
+                    photo = ImageTk.PhotoImage(img)
+                    lbl = tk.Label(root, image=photo, bg=t["bg"])
+                    lbl.image = photo  # type: ignore[attr-defined]
+                    lbl.pack(pady=(0, 4))
+                finally:
+                    img.close()
             except Exception:
                 pass
         elif ext_lower in _TEXT_EXTS:
@@ -339,7 +342,7 @@ class SetupWizard:
 
         root = tk.Tk()
         self._root = root
-        root.title("Sort It Now -- Setup")
+        root.title("File Wayfinder -- Setup")
         root.configure(bg=t["bg"])
         root.resizable(False, False)
 
@@ -350,7 +353,7 @@ class SetupWizard:
 
         tk.Label(
             root,
-            text="Sort It Now -- Setup",
+            text="File Wayfinder -- Setup",
             bg=t["bg"],
             fg=t["accent"],
             font=("Segoe UI", 16, "bold"),
@@ -438,7 +441,7 @@ def cli_setup() -> dict[str, list[str]]:
 
     Returns ``{folder: [destinations]}`` or empty dict if cancelled.
     """
-    print("\n=== Sort It Now -- CLI Setup ===\n")
+    print("\n=== File Wayfinder -- CLI Setup ===\n")
     folders: dict[str, list[str]] = {}
 
     while True:

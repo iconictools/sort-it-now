@@ -1,4 +1,4 @@
-"""Configuration management for Sort It Now.
+"""Configuration management for File Wayfinder.
 
 Stores monitored folders, destination sets, and user preferences as JSON.
 """
@@ -13,7 +13,7 @@ import time
 import zipfile
 from typing import Any
 
-from sort_it_now.constants import DEFAULT_CONFIG_FILE
+from file_wayfinder.constants import DEFAULT_CONFIG_FILE
 
 logger = logging.getLogger(__name__)
 

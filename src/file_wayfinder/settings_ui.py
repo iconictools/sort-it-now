@@ -1,4 +1,4 @@
-"""Settings dialog for Sort It Now (tkinter-based).
+"""Settings dialog for File Wayfinder (tkinter-based).
 
 Lets the user edit config settings without touching JSON directly.
 """
@@ -10,11 +10,11 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
-from sort_it_now.autostart import is_autostart_enabled, set_autostart
-from sort_it_now.themes import get_theme
+from file_wayfinder.autostart import is_autostart_enabled, set_autostart
+from file_wayfinder.themes import get_theme
 
 if TYPE_CHECKING:
-    from sort_it_now.config import Config
+    from file_wayfinder.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class SettingsDialog:
         """Display the settings dialog (blocks until closed)."""
         t = self._theme
         root = tk.Tk()
-        root.title("Sort It Now -- Settings")
+        root.title("File Wayfinder -- Settings")
         root.configure(bg=t["bg"])
         root.resizable(False, False)
 

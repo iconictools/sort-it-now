@@ -1,4 +1,4 @@
-"""File system watcher for Sort It Now.
+"""File system watcher for File Wayfinder.
 
 Uses *watchdog* to monitor folders for new, moved, or modified files.
 Implements smart delay to wait for downloads to finish before prompting.
@@ -16,8 +16,8 @@ from typing import Callable
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from sort_it_now.classifier import is_temp_file, matches_ignore_pattern
-from sort_it_now.constants import (
+from file_wayfinder.classifier import is_temp_file, matches_ignore_pattern
+from file_wayfinder.constants import (
     FILE_STABLE_CHECK_INTERVAL,
     FILE_STABLE_DELAY_SECONDS,
     FILE_STABLE_MAX_CHECKS,
@@ -53,14 +53,16 @@ class _Handler(FileSystemEventHandler):
         callback: Callable[[str], None],
         ignore_patterns: list[str],
         self_moved_paths: set[str],
+        self_moved_lock: threading.Lock,
         catch_folders: bool = False,
     ) -> None:
         super().__init__()
         self._callback = callback
         self._ignore_patterns = ignore_patterns
         self._self_moved: set[str] = self_moved_paths
+        self._self_moved_lock = self_moved_lock
         self._pending: set[str] = set()
-        self._lock = threading.Lock()
+        self._pending_lock = threading.Lock()
         self._catch_folders = catch_folders
 
     def _should_ignore(self, path: str) -> bool:
@@ -77,10 +79,11 @@ class _Handler(FileSystemEventHandler):
         if self._should_ignore(path):
             return
         # Prevent self-triggered loops
-        with self._lock:
+        with self._self_moved_lock:
             if path in self._self_moved:
                 self._self_moved.discard(path)
                 return
+        with self._pending_lock:
             if path in self._pending:
                 return
             self._pending.add(path)
@@ -90,7 +93,7 @@ class _Handler(FileSystemEventHandler):
                 if _wait_until_stable(path):
                     self._callback(path)
             finally:
-                with self._lock:
+                with self._pending_lock:
                     self._pending.discard(path)
 
         thread = threading.Thread(target=_process, daemon=True)
@@ -133,11 +136,13 @@ class FolderWatcher:
         self._catch_folders = catch_folders
         self._observer = Observer()
         self._self_moved_paths: set[str] = set()
+        self._self_moved_lock = threading.Lock()
         self._watches: dict[str, object] = {}
 
     def mark_self_moved(self, path: str) -> None:
         """Register *path* so the next event on it is ignored (loop prevention)."""
-        self._self_moved_paths.add(path)
+        with self._self_moved_lock:
+            self._self_moved_paths.add(path)
 
     def add_folder(self, folder: str) -> None:
         """Start watching *folder* (non-recursive)."""
@@ -146,6 +151,7 @@ class FolderWatcher:
             return
         handler = _Handler(
             self._callback, self._ignore_patterns, self._self_moved_paths,
+            self._self_moved_lock,
             catch_folders=self._catch_folders,
         )
         watch = self._observer.schedule(handler, folder, recursive=False)

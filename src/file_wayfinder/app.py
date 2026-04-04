@@ -1,4 +1,4 @@
-"""Main application orchestrator for Sort It Now."""
+"""Main application orchestrator for File Wayfinder."""
 
 from __future__ import annotations
 
@@ -10,20 +10,20 @@ import shutil
 import sys
 import threading
 
-from sort_it_now.classifier import suggest_destinations
-from sort_it_now.config import Config
-from sort_it_now.conflict_ui import resolve_conflict
-from sort_it_now.constants import DEFAULT_UNSORTED_DIR
-from sort_it_now.dashboard_ui import show_batch_list, show_dashboard
-from sort_it_now.duplicate import find_duplicate
-from sort_it_now.history import History
-from sort_it_now.notifications import notify
-from sort_it_now.prompt import SortPrompt, SetupWizard
-from sort_it_now.rules import Rules
-from sort_it_now.rules_ui import RulesDialog
-from sort_it_now.settings_ui import SettingsDialog
-from sort_it_now.tray import TrayIcon
-from sort_it_now.watcher import FolderWatcher
+from file_wayfinder.classifier import suggest_destinations
+from file_wayfinder.config import Config
+from file_wayfinder.conflict_ui import resolve_conflict
+from file_wayfinder.constants import DEFAULT_UNSORTED_DIR
+from file_wayfinder.dashboard_ui import show_batch_list, show_dashboard
+from file_wayfinder.duplicate import find_duplicate
+from file_wayfinder.history import History
+from file_wayfinder.notifications import notify
+from file_wayfinder.prompt import SortPrompt, SetupWizard
+from file_wayfinder.rules import Rules
+from file_wayfinder.rules_ui import RulesDialog
+from file_wayfinder.settings_ui import SettingsDialog
+from file_wayfinder.tray import TrayIcon
+from file_wayfinder.watcher import FolderWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ class App:
                         folder, self._on_file_detected, whitelist,
                     )
 
-        logger.info("Sort It Now is running.")
+        logger.info("File Wayfinder is running.")
         # Tray icon runs on the main thread (required by OS)
         try:
             self.tray.start()
@@ -174,6 +174,18 @@ class App:
     def _on_file_detected(self, filepath: str) -> None:
         """Called by the watcher when a new/stable file or folder is detected."""
         logger.info("Detected: %s", filepath)
+
+        # Skip files that live inside a configured destination folder.
+        # Destination folders are whitelisted by the program so that files
+        # already sorted into them are never re-prompted.
+        parent = os.path.dirname(os.path.abspath(filepath))
+        for dests in self.config.monitored_folders.values():
+            for dest in dests:
+                if os.path.abspath(dest) == parent:
+                    logger.debug(
+                        "In destination folder, skipping: %s", filepath,
+                    )
+                    return
 
         # Skip whitelisted files
         basename = os.path.basename(filepath)
@@ -212,12 +224,13 @@ class App:
                 return
 
         # Determine which monitored folder this file belongs to
-        parent = os.path.dirname(filepath)
+        parent = os.path.dirname(os.path.abspath(filepath))
         destinations = self.config.monitored_folders.get(parent, [])
         if not destinations:
-            # Try to find a matching monitored folder
+            # Try to find a matching monitored folder (with proper path check)
             for mf, dests in self.config.monitored_folders.items():
-                if filepath.startswith(mf):
+                mf_abs = os.path.abspath(mf)
+                if parent == mf_abs or parent.startswith(mf_abs + os.sep):
                     destinations = dests
                     break
 

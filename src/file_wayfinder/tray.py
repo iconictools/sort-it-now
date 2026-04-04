@@ -1,4 +1,4 @@
-"""System tray icon for Sort It Now (pystray-based)."""
+"""System tray icon for File Wayfinder (pystray-based)."""
 
 from __future__ import annotations
 
@@ -123,9 +123,9 @@ class TrayIcon:
     def start(self) -> None:
         """Create and run the tray icon (blocks the calling thread)."""
         self._icon = pystray.Icon(
-            "sort-it-now",
+            "file-wayfinder",
             _icon_idle(),
-            "Sort It Now",
+            "File Wayfinder",
             menu=self._build_menu(),
         )
         self._icon.run()
@@ -143,10 +143,10 @@ class TrayIcon:
         if self._icon:
             if pending:
                 self._icon.icon = _icon_pending(count)
-                self._icon.title = f"Sort It Now ({count} pending)"
+                self._icon.title = f"File Wayfinder ({count} pending)"
             else:
                 self._icon.icon = _icon_idle()
-                self._icon.title = "Sort It Now"
+                self._icon.title = "File Wayfinder"
 
     def stop(self) -> None:
         if self._icon:

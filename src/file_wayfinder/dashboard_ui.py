@@ -1,4 +1,4 @@
-"""Extracted dashboard and batch-list windows for Sort It Now."""
+"""Extracted dashboard and batch-list windows for File Wayfinder."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable
 
-from sort_it_now.themes import get_theme
+from file_wayfinder.themes import get_theme
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def show_dashboard(
     theme = get_theme(theme_name)
 
     root = tk.Tk()
-    root.title("Sort It Now -- Dashboard")
+    root.title("File Wayfinder -- Dashboard")
     root.configure(bg=theme["bg"])
     root.geometry("560x520")
 
@@ -88,7 +88,7 @@ def show_dashboard(
         ).pack(anchor="w")
 
     # -- Rules summary --
-    from sort_it_now.rules import Rules
+    from file_wayfinder.rules import Rules
 
     rules_count = 0
     try:
@@ -200,7 +200,7 @@ def show_batch_list(
     theme = get_theme(theme_name)
 
     root = tk.Tk()
-    root.title("Sort It Now -- Batch Processing")
+    root.title("File Wayfinder -- Batch Processing")
     root.configure(bg=theme["bg"])
     root.geometry("600x400")
 

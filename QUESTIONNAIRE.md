@@ -1,4 +1,4 @@
-# Sort It Now — Project Analysis & Design Questionnaire
+# File Wayfinder — Project Analysis & Design Questionnaire
 
 > **Purpose:** This document rates the current state of the project and asks
 > you (the project owner) about every unaddressed decision and improvement

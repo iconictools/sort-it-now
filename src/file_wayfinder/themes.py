@@ -1,4 +1,4 @@
-"""Theme management for Sort It Now.
+"""Theme management for File Wayfinder.
 
 Supports dark and light themes for all tkinter windows.
 """

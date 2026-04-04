@@ -10,8 +10,8 @@ import time
 
 import pytest
 
-from sort_it_now.history import History
-from sort_it_now.themes import get_theme, THEMES
+from file_wayfinder.history import History
+from file_wayfinder.themes import get_theme, THEMES
 
 # tkinter is not available in headless CI environments
 _has_tkinter = True
@@ -141,13 +141,13 @@ class TestAutostart:
     """Tests for autostart module (platform-independent logic)."""
 
     def test_is_autostart_returns_false_on_non_windows(self):
-        from sort_it_now.autostart import is_autostart_enabled
+        from file_wayfinder.autostart import is_autostart_enabled
 
         if sys.platform != "win32":
             assert is_autostart_enabled() is False
 
     def test_set_autostart_returns_false_on_non_windows(self):
-        from sort_it_now.autostart import set_autostart
+        from file_wayfinder.autostart import set_autostart
 
         if sys.platform != "win32":
             assert set_autostart(True) is False
@@ -159,7 +159,7 @@ class TestDndCheck:
 
     @skip_no_display
     def test_dnd_returns_false_on_non_windows(self):
-        from sort_it_now.app import _is_dnd_active
+        from file_wayfinder.app import _is_dnd_active
 
         if sys.platform != "win32":
             assert _is_dnd_active() is False
@@ -169,36 +169,36 @@ class TestModuleImports:
     """Verify all new modules can be imported without errors."""
 
     def test_import_themes(self):
-        import sort_it_now.themes
-        assert hasattr(sort_it_now.themes, "get_theme")
+        import file_wayfinder.themes
+        assert hasattr(file_wayfinder.themes, "get_theme")
 
     def test_import_autostart(self):
-        import sort_it_now.autostart
-        assert hasattr(sort_it_now.autostart, "is_autostart_enabled")
+        import file_wayfinder.autostart
+        assert hasattr(file_wayfinder.autostart, "is_autostart_enabled")
 
     @skip_no_tkinter
     def test_import_conflict_ui(self):
-        import sort_it_now.conflict_ui
-        assert hasattr(sort_it_now.conflict_ui, "resolve_conflict")
+        import file_wayfinder.conflict_ui
+        assert hasattr(file_wayfinder.conflict_ui, "resolve_conflict")
 
     @skip_no_tkinter
     def test_import_settings_ui(self):
-        import sort_it_now.settings_ui
-        assert hasattr(sort_it_now.settings_ui, "SettingsDialog")
+        import file_wayfinder.settings_ui
+        assert hasattr(file_wayfinder.settings_ui, "SettingsDialog")
 
     @skip_no_tkinter
     def test_import_rules_ui(self):
-        import sort_it_now.rules_ui
-        assert hasattr(sort_it_now.rules_ui, "RulesDialog")
+        import file_wayfinder.rules_ui
+        assert hasattr(file_wayfinder.rules_ui, "RulesDialog")
 
     @skip_no_display
     def test_import_app_dnd(self):
-        from sort_it_now.app import _is_dnd_active
+        from file_wayfinder.app import _is_dnd_active
         assert callable(_is_dnd_active)
 
     @skip_no_tkinter
     def test_import_prompt_cli_setup(self):
-        from sort_it_now.prompt import cli_setup
+        from file_wayfinder.prompt import cli_setup
         assert callable(cli_setup)
 
 
@@ -207,12 +207,12 @@ class TestDashboardUI:
 
     @skip_no_tkinter
     def test_show_dashboard_exists(self):
-        from sort_it_now.dashboard_ui import show_dashboard
+        from file_wayfinder.dashboard_ui import show_dashboard
         assert callable(show_dashboard)
 
     @skip_no_tkinter
     def test_show_batch_list_exists(self):
-        from sort_it_now.dashboard_ui import show_batch_list
+        from file_wayfinder.dashboard_ui import show_batch_list
         assert callable(show_batch_list)
 
 
@@ -225,35 +225,35 @@ class TestPatternRules:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_set_and_get_pattern_rule(self):
-        from sort_it_now.rules import Rules
+        from file_wayfinder.rules import Rules
         r = Rules(self._rules_file)
         r.set_pattern_rule("*.pdf", "/dest/docs", "glob")
         assert len(r.pattern_rules) == 1
         assert r.pattern_rules[0]["pattern"] == "*.pdf"
 
     def test_remove_pattern_rule(self):
-        from sort_it_now.rules import Rules
+        from file_wayfinder.rules import Rules
         r = Rules(self._rules_file)
         r.set_pattern_rule("*.pdf", "/dest/docs", "glob")
         r.remove_pattern_rule("*.pdf")
         assert len(r.pattern_rules) == 0
 
     def test_get_pattern_destination_glob(self):
-        from sort_it_now.rules import Rules
+        from file_wayfinder.rules import Rules
         r = Rules(self._rules_file)
         r.set_pattern_rule("invoice*.pdf", "/dest/invoices", "glob")
         result = r.get_pattern_destination("/tmp/invoice_2024.pdf")
         assert result == "/dest/invoices"
 
     def test_get_pattern_destination_regex(self):
-        from sort_it_now.rules import Rules
+        from file_wayfinder.rules import Rules
         r = Rules(self._rules_file)
         r.set_pattern_rule(r"report_\d+\.csv", "/dest/reports", "regex")
         result = r.get_pattern_destination("/tmp/report_123.csv")
         assert result == "/dest/reports"
 
     def test_get_pattern_destination_no_match(self):
-        from sort_it_now.rules import Rules
+        from file_wayfinder.rules import Rules
         r = Rules(self._rules_file)
         r.set_pattern_rule("*.pdf", "/dest/docs", "glob")
         result = r.get_pattern_destination("/tmp/file.txt")
@@ -268,7 +268,7 @@ class TestAtomicSave:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_config_save_creates_valid_file(self):
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.set_setting("test_key", "test_value")
@@ -279,14 +279,14 @@ class TestAtomicSave:
         assert data["global_settings"]["test_key"] == "test_value"
 
     def test_config_save_no_tmp_leftover(self):
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.set_setting("key", "val")
         assert not os.path.exists(path + ".tmp")
 
     def test_rules_save_creates_valid_file(self):
-        from sort_it_now.rules import Rules
+        from file_wayfinder.rules import Rules
         path = os.path.join(self._tmpdir, "rules.json")
         r = Rules(path)
         r.set_rule(".txt", "/dest")
@@ -304,7 +304,7 @@ class TestDuplicateDetection:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_compute_file_hash(self):
-        from sort_it_now.duplicate import compute_file_hash
+        from file_wayfinder.duplicate import compute_file_hash
         path = os.path.join(self._tmpdir, "test.txt")
         with open(path, "w") as f:
             f.write("hello world")
@@ -313,7 +313,7 @@ class TestDuplicateDetection:
         assert len(h) == 64  # sha256 hex digest length
 
     def test_find_duplicate_found(self):
-        from sort_it_now.duplicate import find_duplicate
+        from file_wayfinder.duplicate import find_duplicate
         src = os.path.join(self._tmpdir, "src.txt")
         dest_dir = os.path.join(self._tmpdir, "dest")
         os.makedirs(dest_dir)
@@ -327,7 +327,7 @@ class TestDuplicateDetection:
         assert result == dup
 
     def test_find_duplicate_not_found(self):
-        from sort_it_now.duplicate import find_duplicate
+        from file_wayfinder.duplicate import find_duplicate
         src = os.path.join(self._tmpdir, "src.txt")
         dest_dir = os.path.join(self._tmpdir, "dest")
         os.makedirs(dest_dir)
@@ -347,14 +347,14 @@ class TestWhitelist:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_add_and_get_whitelist(self):
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.add_to_whitelist("*.log")
         assert "*.log" in c.get_whitelist()
 
     def test_remove_from_whitelist(self):
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.add_to_whitelist("*.log")
@@ -362,7 +362,7 @@ class TestWhitelist:
         assert "*.log" not in c.get_whitelist()
 
     def test_whitelist_no_duplicates(self):
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.add_to_whitelist("*.log")
@@ -374,20 +374,20 @@ class TestRenamePattern:
     @skip_no_display
     def test_apply_rename_pattern_with_date_and_name(self):
         import datetime
-        from sort_it_now.app import _apply_rename_pattern
+        from file_wayfinder.app import _apply_rename_pattern
         result = _apply_rename_pattern("/tmp/report.pdf", "{date}_{name}")
         today = datetime.date.today().isoformat()
         assert result == f"{today}_report.pdf"
 
     @skip_no_display
     def test_apply_rename_pattern_preserves_ext(self):
-        from sort_it_now.app import _apply_rename_pattern
+        from file_wayfinder.app import _apply_rename_pattern
         result = _apply_rename_pattern("/tmp/file.txt", "{name}_copy")
         assert result.endswith(".txt")
 
     @skip_no_display
     def test_apply_rename_pattern_with_ext_token(self):
-        from sort_it_now.app import _apply_rename_pattern
+        from file_wayfinder.app import _apply_rename_pattern
         result = _apply_rename_pattern("/tmp/data.csv", "{name}{ext}")
         assert result == "data.csv"
 
@@ -400,8 +400,8 @@ class TestConfigExportImport:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_export_import_roundtrip(self):
-        from sort_it_now.config import Config
-        from sort_it_now.rules import Rules
+        from file_wayfinder.config import Config
+        from file_wayfinder.rules import Rules
 
         config_path = os.path.join(self._tmpdir, "config.json")
         rules_path = os.path.join(self._tmpdir, "rules.json")
@@ -429,7 +429,7 @@ class TestConfigSaveMany:
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_save_many_batches_writes(self):
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.save_many({
@@ -443,7 +443,7 @@ class TestConfigSaveMany:
 
     def test_save_many_persists_to_disk(self):
         import json
-        from sort_it_now.config import Config
+        from file_wayfinder.config import Config
         path = os.path.join(self._tmpdir, "config.json")
         c = Config(path)
         c.save_many({"key1": "val1", "key2": "val2"})
@@ -455,11 +455,11 @@ class TestConfigSaveMany:
 
 class TestNotifications:
     def test_notify_function_exists(self):
-        from sort_it_now.notifications import notify
+        from file_wayfinder.notifications import notify
         assert callable(notify)
 
     def test_notify_does_not_crash(self):
-        from sort_it_now.notifications import notify
+        from file_wayfinder.notifications import notify
         # Should not raise even if plyer fails
         notify("Test", "Message", timeout=1)
 
@@ -468,19 +468,19 @@ class TestCatchFolders:
     """Tests for the catch_folders option in FolderWatcher."""
 
     def test_watcher_accepts_catch_folders(self):
-        from sort_it_now.watcher import FolderWatcher
+        from file_wayfinder.watcher import FolderWatcher
 
         w = FolderWatcher(callback=lambda p: None, catch_folders=True)
         assert w._catch_folders is True
 
     def test_watcher_default_no_catch_folders(self):
-        from sort_it_now.watcher import FolderWatcher
+        from file_wayfinder.watcher import FolderWatcher
 
         w = FolderWatcher(callback=lambda p: None)
         assert w._catch_folders is False
 
     def test_scan_existing_includes_dirs_when_enabled(self):
-        from sort_it_now.watcher import FolderWatcher
+        from file_wayfinder.watcher import FolderWatcher
 
         tmpdir = tempfile.mkdtemp()
         try:
@@ -498,7 +498,7 @@ class TestCatchFolders:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_scan_existing_skips_dirs_when_disabled(self):
-        from sort_it_now.watcher import FolderWatcher
+        from file_wayfinder.watcher import FolderWatcher
 
         tmpdir = tempfile.mkdtemp()
         try:
@@ -520,7 +520,7 @@ class TestSortPromptWhitelist:
 
     @skip_no_tkinter
     def test_sort_prompt_accepts_whitelist_callback(self):
-        from sort_it_now.prompt import SortPrompt
+        from file_wayfinder.prompt import SortPrompt
 
         called: list[str] = []
         prompt = SortPrompt(
@@ -533,7 +533,7 @@ class TestSortPromptWhitelist:
 
     @skip_no_tkinter
     def test_sort_prompt_works_without_whitelist(self):
-        from sort_it_now.prompt import SortPrompt
+        from file_wayfinder.prompt import SortPrompt
 
         prompt = SortPrompt(
             filepath="/tmp/test.txt",

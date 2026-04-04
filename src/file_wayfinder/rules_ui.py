@@ -1,4 +1,4 @@
-"""Rule management UI for Sort It Now (tkinter-based).
+"""Rule management UI for File Wayfinder (tkinter-based).
 
 Lets the user view, edit, and delete learned auto-sort rules.
 """
@@ -11,11 +11,11 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
-from sort_it_now.themes import get_theme
+from file_wayfinder.themes import get_theme
 
 if TYPE_CHECKING:
-    from sort_it_now.config import Config
-    from sort_it_now.rules import Rules
+    from file_wayfinder.config import Config
+    from file_wayfinder.rules import Rules
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class RulesDialog:
         """Display the rule management dialog."""
         t = self._theme
         root = tk.Tk()
-        root.title("Sort It Now -- Rules")
+        root.title("File Wayfinder -- Rules")
         root.configure(bg=t["bg"])
         root.resizable(False, False)
 

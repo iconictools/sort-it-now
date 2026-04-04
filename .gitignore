@@ -26,6 +26,6 @@ env/
 Thumbs.db
 
 # Project
-sort_it_now_config.json
-sort_it_now_history.db
+file_wayfinder_config.json
+file_wayfinder_history.db
 *.log

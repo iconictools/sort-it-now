@@ -1,9 +1,9 @@
-"""Entry point for Sort It Now.
+"""Entry point for File Wayfinder.
 
 Usage:
-    python -m sort_it_now          # Run the app (GUI)
-    python -m sort_it_now --help   # Show help
-    python -m sort_it_now --setup-cli  # CLI setup wizard
+    python -m file_wayfinder          # Run the app (GUI)
+    python -m file_wayfinder --help   # Show help
+    python -m file_wayfinder --setup-cli  # CLI setup wizard
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ import logging  # noqa: E402
 import logging.handlers  # noqa: E402
 import os  # noqa: E402
 
-from sort_it_now import __version__  # noqa: E402
-from sort_it_now.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE  # noqa: E402
+from file_wayfinder import __version__  # noqa: E402
+from file_wayfinder.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE  # noqa: E402
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -56,7 +56,7 @@ def _setup_logging(verbose: bool) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        prog="sort-it-now",
+        prog="file-wayfinder",
         description="Tray-resident real-time file organizer assistant.",
     )
     parser.add_argument(
@@ -80,14 +80,14 @@ def main(argv: list[str] | None = None) -> None:
 
     _setup_logging(args.verbose)
 
-    from sort_it_now.config import Config
-    from sort_it_now.app import App
+    from file_wayfinder.config import Config
+    from file_wayfinder.app import App
 
     config = Config(args.config)
 
     # CLI setup mode (Q2.1c)
     if args.setup_cli:
-        from sort_it_now.prompt import cli_setup
+        from file_wayfinder.prompt import cli_setup
 
         folders = cli_setup()
         for folder, dests in folders.items():

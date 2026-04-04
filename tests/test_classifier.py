@@ -1,7 +1,7 @@
 """Tests for the classifier module."""
 
 
-from sort_it_now.classifier import (
+from file_wayfinder.classifier import (
     classify_by_extension,
     is_temp_file,
     matches_ignore_pattern,

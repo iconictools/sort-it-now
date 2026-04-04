@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local build script for Sort It Now.
+"""Local build script for File Wayfinder.
 
 Creates a standalone executable using PyInstaller.
 
@@ -14,7 +14,7 @@ import sys
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build Sort It Now executable")
+    parser = argparse.ArgumentParser(description="Build File Wayfinder executable")
     parser.add_argument(
         "--onefile",
         action="store_true",
@@ -26,11 +26,11 @@ def main() -> None:
         sys.executable,
         "-m",
         "PyInstaller",
-        "--name=sort-it-now",
+        "--name=file-wayfinder",
         "--windowed",
         "--noconfirm",
         "--clean",
-        "src/sort_it_now/__main__.py",
+        "src/file_wayfinder/__main__.py",
     ]
     if args.onefile:
         cmd.append("--onefile")

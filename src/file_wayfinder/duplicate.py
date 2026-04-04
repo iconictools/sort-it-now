@@ -1,4 +1,4 @@
-"""Duplicate file detection for Sort It Now."""
+"""Duplicate file detection for File Wayfinder."""
 
 from __future__ import annotations
 

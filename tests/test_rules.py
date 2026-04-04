@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from sort_it_now.rules import Rules
+from file_wayfinder.rules import Rules
 
 
 class TestRules:

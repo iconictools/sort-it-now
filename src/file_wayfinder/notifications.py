@@ -1,4 +1,4 @@
-"""Native toast notifications for Sort It Now."""
+"""Native toast notifications for File Wayfinder."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def notify(title: str, message: str, timeout: int = 5) -> None:
                 title=title,
                 message=message,
                 timeout=timeout,
-                app_name="Sort It Now",
+                app_name="File Wayfinder",
             )
         except Exception as exc:
             logger.debug("Native notification failed: %s", exc)

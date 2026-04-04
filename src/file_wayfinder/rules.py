@@ -1,4 +1,4 @@
-"""Auto-rules / pattern learning for Sort It Now.
+"""Auto-rules / pattern learning for File Wayfinder.
 
 Persists extension-to-destination mappings so the app can auto-sort
 files the user has previously classified.
@@ -16,7 +16,7 @@ import time
 from collections import Counter
 from typing import Any
 
-from sort_it_now.constants import DEFAULT_RULES_FILE
+from file_wayfinder.constants import DEFAULT_RULES_FILE
 
 logger = logging.getLogger(__name__)
 

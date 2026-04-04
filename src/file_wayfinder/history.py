@@ -1,4 +1,4 @@
-"""Undo / action history backed by SQLite for Sort It Now."""
+"""Undo / action history backed by SQLite for File Wayfinder."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import shutil
 import sqlite3
 import time
 
-from sort_it_now.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
+from file_wayfinder.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS actions (

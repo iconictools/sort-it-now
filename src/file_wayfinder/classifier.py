@@ -1,4 +1,4 @@
-"""Smart file classification for Sort It Now.
+"""Smart file classification for File Wayfinder.
 
 Suggests destination folders based on file extension, name patterns,
 and learned rules.
@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from fnmatch import fnmatch
 
-from sort_it_now.constants import FILE_TYPE_MAP, TEMP_EXTENSIONS
+from file_wayfinder.constants import FILE_TYPE_MAP, TEMP_EXTENSIONS
 
 
 def is_temp_file(filepath: str) -> bool:

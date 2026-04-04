@@ -1,7 +1,7 @@
 """Tests for the watcher module (unit-level, no I/O waiting)."""
 
 
-from sort_it_now.classifier import is_temp_file, matches_ignore_pattern
+from file_wayfinder.classifier import is_temp_file, matches_ignore_pattern
 
 
 class TestWatcherHelpers:
