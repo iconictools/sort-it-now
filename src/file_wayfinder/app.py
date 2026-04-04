@@ -251,11 +251,22 @@ class App:
 
         theme_name = self.config.get_setting("theme", "dark")
 
+        # Build quick-add callback (only meaningful for directories)
+        parent_monitored = parent
+        for mf in self.config.monitored_folders:
+            if os.path.abspath(mf) == parent:
+                parent_monitored = mf
+                break
+
+        def _on_quick_add(folder_path: str) -> None:
+            self._quick_add_folder(folder_path, parent_monitored)
+
         # Show prompt on the main thread via threading
         prompt = SortPrompt(
             filepath, ordered, self._on_prompt_done,
             theme=theme_name,
             on_whitelist=self.config.add_to_whitelist,
+            on_quick_add=_on_quick_add,
         )
         t = threading.Thread(target=prompt.show, daemon=True)
         t.start()
@@ -482,6 +493,85 @@ class App:
         # If not whitelisted, open sorting screen immediately
         if not whitelist_existing and existing:
             self._process_batch_queue()
+
+    def _quick_add_folder(self, folder_path: str, parent_monitored: str) -> None:
+        """Add a detected directory as a new monitored folder (Quick Add Folder).
+
+        Behaviour is controlled by three settings:
+
+        * ``quick_add_inherit_destinations`` — if True, the new folder inherits
+          the destination list of the monitored folder it was detected in.  If
+          False, a destination picker dialog is shown.
+        * ``quick_add_auto_whitelist`` — if True, the folder name is added to
+          the whitelist so it is never re-prompted from the parent folder.
+        * ``quick_add_auto_start_watch`` — if True, the watcher begins
+          monitoring the new folder immediately.
+        """
+        # Already monitored?
+        if folder_path in self.config.monitored_folders:
+            logger.info("Quick Add: already monitored — %s", folder_path)
+            return
+
+        inherit = self.config.get_setting("quick_add_inherit_destinations", True)
+        auto_whitelist = self.config.get_setting("quick_add_auto_whitelist", True)
+        auto_watch = self.config.get_setting("quick_add_auto_start_watch", True)
+
+        # Resolve destinations
+        if inherit:
+            dests = list(self.config.monitored_folders.get(parent_monitored, []))
+        else:
+            # Open a destination picker
+            import tkinter as tk
+            from tkinter import filedialog, messagebox
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+
+            messagebox.showinfo(
+                "Quick Add Folder — Destinations",
+                f"Choose destination folders for:\n{folder_path}\n\n"
+                "Click Cancel when finished.",
+                parent=root,
+            )
+            dests = []
+            while True:
+                dest = filedialog.askdirectory(
+                    title=f"Destination for {os.path.basename(folder_path)} (Cancel to finish)",
+                    parent=root,
+                )
+                if not dest:
+                    break
+                if dest not in dests:
+                    dests.append(dest)
+            root.destroy()
+
+            if not dests:
+                logger.info(
+                    "Quick Add: no destinations chosen, aborting — %s", folder_path
+                )
+                return
+
+        self.config.add_monitored_folder(folder_path, dests)
+        logger.info(
+            "Quick Add: added %s -> %s", folder_path, dests
+        )
+
+        if auto_whitelist:
+            self.config.add_to_whitelist(os.path.basename(folder_path))
+            logger.info(
+                "Quick Add: whitelisted folder name '%s'",
+                os.path.basename(folder_path),
+            )
+
+        if auto_watch:
+            try:
+                self.watcher.add_folder(folder_path)
+                logger.info("Quick Add: now watching %s", folder_path)
+            except Exception as exc:
+                logger.error("Quick Add: cannot watch %s: %s", folder_path, exc)
+
+        self._update_tray_monitored_count()
 
     def _toggle_focus(self) -> None:
         self._focus_mode = not self._focus_mode

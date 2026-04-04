@@ -23,6 +23,7 @@ class SortPrompt:
         on_done: Callable[[str, str | None, bool], None],
         theme: str = "dark",
         on_whitelist: Callable[[str], None] | None = None,
+        on_quick_add: Callable[[str], None] | None = None,
     ) -> None:
         """
         Parameters
@@ -37,6 +38,9 @@ class SortPrompt:
             Theme name (``'dark'`` or ``'light'``).
         on_whitelist:
             Called with a glob pattern when the user clicks "Add to whitelist".
+        on_quick_add:
+            Called with the folder path when the user clicks "Quick Add Folder"
+            (only shown when the detected item is a directory).
         """
         self._filepath = filepath
         self._destinations = destinations
@@ -44,6 +48,7 @@ class SortPrompt:
         self._always = False
         self._theme_name = theme
         self._on_whitelist = on_whitelist
+        self._on_quick_add = on_quick_add
 
     def show(self) -> None:
         """Display the prompt (blocks until user responds)."""
@@ -272,6 +277,28 @@ class SortPrompt:
         bottom_frame.pack(pady=(0, 8))
 
         whitelisted = [False]
+        quick_added = [False]
+
+        # Quick Add Folder button — only shown when the detected item is a directory
+        if is_dir and self._on_quick_add is not None:
+            _fp = self._filepath
+            _qa = self._on_quick_add
+
+            def _do_quick_add() -> None:
+                quick_added[0] = True
+                root.destroy()
+                _qa(_fp)
+
+            tk.Button(
+                bottom_frame,
+                text="Quick Add Folder",
+                bg=t["accent"],
+                fg=t["bg"],
+                activebackground=t["btn_active"],
+                relief="flat",
+                font=("Segoe UI", 9, "bold"),
+                command=_do_quick_add,
+            ).pack(side="left", padx=4)
 
         # Add to whitelist button
         if self._on_whitelist is not None:
@@ -307,6 +334,10 @@ class SortPrompt:
         ).pack(side="left", padx=4)
 
         root.mainloop()
+
+        # If quick-added, the on_quick_add callback handled everything
+        if quick_added[0]:
+            return
 
         # If whitelisted, skip callback — file stays in place
         if whitelisted[0]:

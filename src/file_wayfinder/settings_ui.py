@@ -200,6 +200,67 @@ class SettingsDialog:
         ).grid(row=row, column=1, sticky="w", pady=4, padx=(8, 0))
         row += 1
 
+        # ── Quick Add Folder ────────────────────────────────────────────
+        tk.Label(
+            frame, text="Quick Add Folder:", bg=t["bg"], fg=t["accent"],
+            font=("Segoe UI", 10, "bold"),
+        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(10, 2))
+        row += 1
+
+        # Inherit destinations
+        tk.Label(
+            frame, text="  Inherit parent destinations:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=2)
+        qa_inherit_var = tk.BooleanVar(
+            value=self._config.get_setting("quick_add_inherit_destinations", True)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Enabled (skips destination picker)",
+            variable=qa_inherit_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=2, padx=(8, 0))
+        row += 1
+
+        # Auto-whitelist after quick add
+        tk.Label(
+            frame, text="  Auto-whitelist folder:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=2)
+        qa_whitelist_var = tk.BooleanVar(
+            value=self._config.get_setting("quick_add_auto_whitelist", True)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Ignore folder name in future scans",
+            variable=qa_whitelist_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=2, padx=(8, 0))
+        row += 1
+
+        # Auto-start watch
+        tk.Label(
+            frame, text="  Auto-start watching:", bg=t["bg"], fg=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=0, sticky="w", pady=2)
+        qa_watch_var = tk.BooleanVar(
+            value=self._config.get_setting("quick_add_auto_start_watch", True)
+        )
+        tk.Checkbutton(
+            frame,
+            text="Monitor new folder immediately",
+            variable=qa_watch_var,
+            bg=t["bg"], fg=t["fg"], selectcolor=t["btn_bg"],
+            activebackground=t["bg"], activeforeground=t["fg"],
+            font=("Segoe UI", 10),
+        ).grid(row=row, column=1, sticky="w", pady=2, padx=(8, 0))
+        row += 1
+
         # -- Monitored folders section --
         tk.Label(
             frame, text="Monitored folders:", bg=t["bg"], fg=t["fg"],
