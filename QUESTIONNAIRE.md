@@ -43,7 +43,7 @@ Fill in each **→ Answer:** to guide the next development iteration.
 → Answer: **(a)** Windows only
 
 **Q1.3** Should the app be distributable via a package manager?
-(a) PyPI (`pip install sort-it-now`)  (b) Homebrew / Chocolatey / Snap  (c) Standalone binary only  (d) Not important yet
+(a) PyPI (`pip install file-wayfinder`)  (b) Homebrew / Chocolatey / Snap  (c) Standalone binary only  (d) Not important yet
 
 → Answer: **(c)** Standalone binary only
 
@@ -290,3 +290,224 @@ Rate each feature: **H**igh / **M**edium / **L**ow / **N**o (don't want it).
 1. Fill in every **→ Answer:** line above.
 2. Commit this file back to the repo (or paste your answers in a GitHub issue).
 3. The next development round will use your answers to prioritise work.
+
+---
+
+## 🧭 File Wayfinder — Direction Questionnaire (Round 2)
+
+> Now that the core features are built, here are the roadblocks, ideas, and
+> questions I need your direction on. Reply inline or via PR comments.
+
+---
+
+### D1. Tkinter Thread Safety
+
+**Context:** tkinter is not thread-safe — creating `tk.Tk()` windows from
+background threads works on most systems but can cause random crashes on
+macOS and occasionally on Windows. Currently, every popup (sort prompt,
+settings, rules, dashboard, conflict) runs in its own background thread.
+
+**Question:** Should I refactor the UI to use a single tkinter main loop
+with `root.after()` for cross-thread communication? This is a significant
+rewrite of the UI layer but would eliminate all possible tkinter crashes.
+
+→ **Answer:**
+
+---
+
+### D2. Migration from .sort-it-now to .file-wayfinder
+
+**Context:** The config directory changed from `~/.sort-it-now/` to
+`~/.file-wayfinder/`. Existing users would lose their config, rules,
+and history.
+
+**Question:** Should I add an auto-migration that copies files from
+`~/.sort-it-now/` to `~/.file-wayfinder/` on first run if the old
+directory exists? Or start fresh?
+
+(a) Auto-migrate old config on first run
+(b) Start fresh — no migration
+(c) Prompt the user to choose
+
+→ **Answer:**
+
+---
+
+### D3. Notification Fallback Strategy
+
+**Context:** `plyer` notifications work on most systems but fail silently
+on some Linux distros without a notification daemon. Currently we fall
+back to logging.
+
+**Question:** When native notifications fail, should we:
+
+(a) Fall back to a small tkinter toast popup (always works, but another window)
+(b) Just log it (current behavior)
+(c) Show a transient tkinter label that auto-dismisses after 3 seconds
+
+→ **Answer:**
+
+---
+
+### D4. Rule Conflict Resolution
+
+**Context:** If an auto-learned extension rule says `.pdf → Documents`
+but a pattern rule says `invoice*.pdf → Finances`, which wins? Currently
+auto-rules are checked first.
+
+**Question:** What should the priority order be?
+
+(a) Pattern rules first, then auto-learned (more specific wins)
+(b) Auto-learned first, then pattern rules (current behavior)
+(c) Let the user configure the priority order in settings
+
+→ **Answer:**
+
+---
+
+### D5. Multi-Instance Protection
+
+**Context:** If the user accidentally launches the app twice, both
+instances would watch the same folders and race to move files, causing
+errors. There's no lock file or single-instance check.
+
+**Question:** Should I add a lock file to prevent multiple instances?
+
+(a) Yes — show a message and exit if already running
+(b) No — it's fine for personal use
+
+→ **Answer:**
+
+---
+
+### D6. Folder Monitoring Depth
+
+**Context:** Currently we watch folders non-recursively (top-level only).
+If a user drops a file into a subfolder of a monitored folder, it won't
+be detected.
+
+**Question:** Should I add an option for recursive monitoring?
+
+(a) Add a per-folder "recursive" toggle in settings
+(b) Keep it non-recursive only
+(c) Make it a global setting
+
+→ **Answer:**
+
+---
+
+### D7. CLI Mode
+
+**Context:** The `--setup-cli` flag lets users configure folders from the
+terminal, but the app itself always needs a display for the tray icon and
+prompts.
+
+**Question:** Would a headless/daemon mode be useful? Files would be
+sorted purely by rules (no prompts), with results only in the log file.
+Useful for servers or running in the background without a desktop.
+
+(a) Yes — add a `--headless` mode
+(b) No — GUI-only is fine
+
+→ **Answer:**
+
+---
+
+### D8. Statistics & Analytics
+
+**Context:** The dashboard shows basic counts (total, today, this week).
+We could track more: most sorted file types, busiest time of day,
+most-used destinations, average files per day.
+
+**Question:** How deep should statistics go?
+
+(a) Current level is fine (basic counts)
+(b) Add detailed analytics (charts, trends, breakdown by type)
+(c) Add a simple weekly summary notification
+
+→ **Answer:**
+
+---
+
+### D9. File Wayfinder Icon & Branding
+
+**Context:** The tray icon is currently a simple programmatically-drawn
+blue folder shape. With the rename to File Wayfinder, we could design
+a proper icon.
+
+**Question:** Should I:
+
+(a) Keep the generated icon (simple, works)
+(b) Create a more distinctive compass/waypoint-themed icon in code
+(c) You'll provide an icon file later
+
+→ **Answer:**
+
+---
+
+### D10. Undo Scope
+
+**Context:** Undo currently moves the file back to its original location.
+But if the file was renamed during the move (via rename patterns), the
+undo restores the renamed file to the original location — it doesn't
+undo the rename.
+
+**Question:** Should undo also reverse the rename?
+
+(a) Yes — full undo including name restoration
+(b) No — just move it back (current behavior)
+
+→ **Answer:**
+
+---
+
+### D11. Future Feature Ideas
+
+**Rate each feature 1–5 (1 = don't care, 5 = must have):**
+
+- [ ] Drag-and-drop sort: drag files onto the tray icon to sort them
+- [ ] Keyboard shortcuts in sort prompt (1 = first dest, 2 = second, etc.)
+- [ ] Tagging system: add metadata tags to files during sort
+- [ ] Search across sorted files (find where something went)
+- [ ] Scheduled cleanup reminders ("You have 50 unsorted files")
+- [ ] Cloud sync of config/rules (e.g. via Google Drive or Dropbox folder)
+- [ ] Plugins/extensions API for custom sort logic
+- [ ] File type learning from content (not just extension)
+- [ ] Right-click context menu integration ("Sort with File Wayfinder")
+- [ ] Batch rename tool (separate from sort, just for renaming files)
+
+→ **Ratings:**
+
+---
+
+### D12. Testing Strategy
+
+**Context:** We have 90 unit tests covering config, rules, history,
+watcher, classifier, themes, whitelist, duplicate detection, pattern
+rules, and more. Missing: integration tests that test the full flow
+(file appears → prompt → move → history recorded).
+
+**Question:** Should I invest time in integration/E2E tests?
+
+(a) Yes — add integration tests for the main flow
+(b) Unit tests are sufficient for now
+(c) Add integration tests but only for the critical path
+
+→ **Answer:**
+
+---
+
+### D13. Documentation
+
+**Context:** README covers installation and basic usage. There's no
+user guide, FAQ, or contributing guide.
+
+**Question:** What documentation should I add?
+
+(a) A user guide / getting started tutorial
+(b) A FAQ section in the README
+(c) A CONTRIBUTING.md for open-source contributions
+(d) All of the above
+(e) README is sufficient
+
+→ **Answer:**
