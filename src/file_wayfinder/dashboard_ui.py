@@ -105,7 +105,7 @@ def show_dashboard(
                 bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
             ).pack(side="left", padx=(6, 0))
     except Exception:
-        pass
+        logger.debug("Taxonomy stats unavailable", exc_info=True)
 
     # -- Inbox Zero progress --
     if pending > 0 or today > 0:

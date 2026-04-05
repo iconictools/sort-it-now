@@ -244,6 +244,12 @@ def _build_folders_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) ->
         _selected_folder.clear()
         _selected_folder.append(watch_list.get(sel[0]))
         _refresh_dests()
+        # Per-folder details update deferred until after widgets are created
+        if _refresh_per_folder_details_fn:
+            _refresh_per_folder_details_fn[0]()
+
+    # Placeholder so the closure can call the detail-refresh before it's defined
+    _refresh_per_folder_details_fn: list = []
 
     watch_list.bind("<<ListboxSelect>>", _on_watch_select)
 
@@ -436,14 +442,8 @@ def _build_folders_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) ->
             pfwl_list.insert("end", pat)
         _label_trace_active[0] = True
 
-    # Patch _on_watch_select to also refresh per-folder details
-    original_on_watch_select = _on_watch_select
-
-    def _on_watch_select_extended(event: object = None) -> None:
-        original_on_watch_select(event)
-        _refresh_per_folder_details()
-
-    watch_list.bind("<<ListboxSelect>>", _on_watch_select_extended)
+    # Register so _on_watch_select can call it
+    _refresh_per_folder_details_fn.append(_refresh_per_folder_details)
 
     # Return the quick-add vars so _save() can persist them
     return {  # type: ignore[return-value]

@@ -323,7 +323,7 @@ class App:
 
         # Check per-folder extension map as an auto-rule override
         _, file_ext = os.path.splitext(filepath)
-        if file_ext and file_ext.lower() in folder_ext_map:
+        if folder_ext_map and file_ext and file_ext.lower() in folder_ext_map:
             auto_dest = folder_ext_map[file_ext.lower()]
             if os.path.isdir(auto_dest):
                 self._move_file(filepath, auto_dest)
