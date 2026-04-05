@@ -148,5 +148,10 @@ class History:
         ).fetchone()
         return row[0] if row else 0
 
+    def clear_records(self) -> None:
+        """Delete all history records without moving any files."""
+        self._conn.execute("DELETE FROM actions")
+        self._conn.commit()
+
     def close(self) -> None:
         self._conn.close()

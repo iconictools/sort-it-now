@@ -216,13 +216,6 @@ class App:
             self.tray.set_pending(True, count)
             return
 
-        # Check auto-rules
-        if self.config.get_setting("auto_learn", True):
-            auto_dest = self.rules.get_auto_destination(filepath)
-            if auto_dest and os.path.isdir(auto_dest):
-                self._move_file(filepath, auto_dest)
-                return
-
         # Check pattern rules
         if self.config.get_setting("pattern_rules_enabled", True):
             pattern_dest = self.rules.get_pattern_destination(filepath)
@@ -280,8 +273,6 @@ class App:
             return
 
         self._move_file(filepath, destination)
-        threshold = self.config.get_setting("auto_learn_threshold", 3)
-        self.rules.record_action(filepath, destination, threshold=threshold)
 
         if always:
             _, ext = os.path.splitext(filepath)
@@ -382,7 +373,7 @@ class App:
     def _add_folder_flow(self) -> None:
         """Background thread: pick folder → configure destinations → start watching."""
         import tkinter as tk
-        from tkinter import filedialog, messagebox, simpledialog
+        from tkinter import filedialog, messagebox
 
         root = tk.Tk()
         root.withdraw()

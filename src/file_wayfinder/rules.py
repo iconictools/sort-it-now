@@ -13,7 +13,6 @@ import os
 import re
 import shutil
 import time
-from collections import Counter
 from typing import Any
 
 from file_wayfinder.constants import DEFAULT_RULES_FILE
@@ -69,14 +68,12 @@ class Rules:
         """Return ``{".ext": "Destination"}`` mapping."""
         return self._data.get("extension_map", {})
 
-    def record_action(
-        self, filepath: str, destination: str, threshold: int = 3
-    ) -> None:
+    def record_action(self, filepath: str, destination: str) -> None:
         """Record that the user sent *filepath* to *destination*.
 
-        After enough consistent decisions for the same extension,
-        this creates an automatic rule.  The *threshold* can be
-        configured (default 3).
+        This is kept purely as an activity log — no automatic rule is
+        ever created from it.  Use :meth:`set_rule` to create a rule
+        explicitly.
         """
         _, ext = os.path.splitext(filepath)
         ext_lower = ext.lower()
@@ -86,18 +83,6 @@ class Rules:
         self._data.setdefault("history", []).append(
             {"ext": ext_lower, "destination": destination}
         )
-
-        # Auto-learn after *threshold* consistent choices
-        counts = Counter(
-            entry["destination"]
-            for entry in self._data["history"]
-            if entry["ext"] == ext_lower
-        )
-        if counts:
-            most_common_dest, count = counts.most_common(1)[0]
-            if count >= threshold:
-                self._data["extension_map"][ext_lower] = most_common_dest
-
         self.save()
 
     def set_rule(self, ext: str, destination: str) -> None:

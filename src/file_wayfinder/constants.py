@@ -117,6 +117,10 @@ FILE_STABLE_MAX_CHECKS = 5
 # Interval between size checks (seconds)
 FILE_STABLE_CHECK_INTERVAL = 1.0
 
+# Age threshold (seconds) used to show the "recently modified / may still be
+# downloading" badge in the sort prompt.
+FILE_STILL_DOWNLOADING_WINDOW_SECONDS = 60
+
 # Default config file location
 DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".file-wayfinder")
 DEFAULT_CONFIG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "config.json")

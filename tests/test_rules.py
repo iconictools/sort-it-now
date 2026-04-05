@@ -30,21 +30,22 @@ class TestRules:
         rules.remove_rule(".pdf")
         assert ".pdf" not in rules.extension_map
 
-    def test_auto_learn_after_3(self):
+    def test_record_action_no_auto_promote(self):
+        """record_action must NOT auto-promote to extension_map (no auto-learning)."""
+        rules = Rules(self._path)
+        for fname in ("a.pdf", "b.pdf", "c.pdf", "d.pdf", "e.pdf"):
+            rules.record_action(fname, "/docs")
+        # No matter how many times, extension_map must stay empty.
+        assert rules.extension_map == {}
+
+    def test_record_action_history_is_logged(self):
+        """record_action stores entries in the internal history list."""
         rules = Rules(self._path)
         rules.record_action("a.pdf", "/docs")
         rules.record_action("b.pdf", "/docs")
-        assert ".pdf" not in rules.extension_map
-        rules.record_action("c.pdf", "/docs")
-        assert rules.extension_map[".pdf"] == "/docs"
-
-    def test_auto_learn_most_common(self):
-        rules = Rules(self._path)
-        rules.record_action("a.jpg", "/photos")
-        rules.record_action("b.jpg", "/photos")
-        rules.record_action("c.jpg", "/memes")
-        rules.record_action("d.jpg", "/photos")
-        assert rules.extension_map[".jpg"] == "/photos"
+        history = rules._data.get("history", [])
+        assert len(history) == 2
+        assert all(h["ext"] == ".pdf" for h in history)
 
     def test_get_auto_destination(self):
         rules = Rules(self._path)
@@ -67,16 +68,12 @@ class TestRules:
         rules.set_rule("PDF", "/docs")
         assert ".pdf" in rules.extension_map
 
-    def test_auto_learn_custom_threshold(self):
-        """Auto-learn should respect configurable threshold (Q5.1)."""
+    def test_auto_learn_custom_threshold_not_applicable(self):
+        """record_action never promotes regardless of call count (threshold removed)."""
         rules = Rules(self._path)
-        rules.record_action("a.csv", "/data", threshold=5)
-        rules.record_action("b.csv", "/data", threshold=5)
-        rules.record_action("c.csv", "/data", threshold=5)
-        assert ".csv" not in rules.extension_map  # 3 < 5
-        rules.record_action("d.csv", "/data", threshold=5)
-        rules.record_action("e.csv", "/data", threshold=5)
-        assert rules.extension_map[".csv"] == "/data"  # 5 >= 5
+        for _ in range(10):
+            rules.record_action("a.csv", "/data")
+        assert ".csv" not in rules.extension_map
 
     def test_corrupt_json_resets(self):
         """Corrupted rules file should be backed up and reset."""

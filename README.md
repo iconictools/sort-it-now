@@ -10,6 +10,12 @@ File Wayfinder lives in your system tray and watches folders you choose (Downloa
 
 Instead of dumping files and cleaning up later, you make a micro-decision at the moment of action — building a tidy file system as a habit.
 
+### Design philosophy
+
+**File Wayfinder never moves a file without your say-so.**
+
+Every other file-watching tool eventually starts sorting files automatically (auto-learn rules, frequency heuristics, ML classifiers). File Wayfinder deliberately does *not*. The point is that *you* are making the decision — the tool is just surfacing it at the right moment and making it instant. You can set explicit pattern rules (glob / regex) for repetitive cases, but nothing happens behind your back.
+
 ### Features
 
 | Feature | Description |
@@ -17,9 +23,10 @@ Instead of dumping files and cleaning up later, you make a micro-decision at the
 | **Real-time monitoring** | Detects new, moved, and modified files instantly via `watchdog` |
 | **Smart prompts** | Non-intrusive popup with context-aware destination suggestions |
 | **File preview** | Image thumbnails, text file previews, and file type labels in the prompt |
-| **Auto-learning rules** | After consistent choices the app sorts that file type automatically |
-| **Pattern rules** | Glob and regex rules (e.g. `invoice*.pdf` → Finances) |
-| **Rename on move** | Configurable rename patterns with date tokens |
+| **Always asks — no auto-sorting** | File Wayfinder **never** moves a file without your confirmation. Every tool auto-sorts eventually — this one doesn't. Your choices stay yours. |
+| **Pattern rules** | Glob and regex rules (e.g. `invoice*.pdf` → Finances) that you set explicitly |
+| **Smart download detection** | On Linux uses inotify `IN_CLOSE_WRITE` (fired the instant the browser closes the file) as the primary signal; falls back to size + mtime polling with exponential backoff on all platforms; on Windows confirms the file is not exclusively locked before prompting |
+| **Rename on move** | Configurable rename patterns with `{name}`, `{date}`, `{ext}` tokens |
 | **Duplicate detection** | SHA256-based duplicate check before moving |
 | **Native notifications** | Toast notifications via plyer (cross-platform) |
 | **Focus / Snooze mode** | Queues prompts during deep work, processes them when you're ready |
@@ -27,14 +34,14 @@ Instead of dumping files and cleaning up later, you make a micro-decision at the
 | **Undo** | One-click revert from the tray menu, plus clickable history |
 | **Dashboard** | Quick view of recent actions, stats, and pending files |
 | **Batch processing** | Process queued files one-by-one or via batch list |
-| **Settings UI** | Full settings dialog — no JSON editing required |
-| **Rule management UI** | View, add, edit, and delete rules visually |
+| **Settings UI** | Full tabbed settings dialog — no JSON editing required |
+| **Rule management UI** | View, add, edit, and delete explicit rules visually |
 | **Dark / Light theme** | Catppuccin-inspired themes |
 | **Whitelist** | Control exactly which files to ignore |
 | **Catch folders** | Optionally detect and sort entire directories |
+| **Quick Add** | Instantly start monitoring a new sub-folder from the sort prompt |
 | **Config import/export** | Backup and restore your setup as a zip |
 | **Autostart** | Start on login (Windows) |
-| **Download awareness** | Waits for `.crdownload` / `.part` files to finish before prompting |
 | **Self-loop prevention** | Files the app moves won't re-trigger the watcher |
 | **Cross-platform** | Works on Windows, macOS, and Linux |
 | **Self-building CI** | GitHub Actions builds executables on every push |
