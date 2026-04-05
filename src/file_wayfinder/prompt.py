@@ -244,6 +244,7 @@ class SortPrompt:
 
         if last_dest is not None and os.path.isdir(last_dest) and last_dest in self._destinations:
             dest_name = os.path.basename(last_dest)
+            _ld: str = last_dest  # narrow type for lambda default
             tk.Button(
                 btn_frame,
                 text=f"↑ Same as last ({dest_name})",
@@ -252,7 +253,7 @@ class SortPrompt:
                 activebackground=t["btn_active"],
                 relief="flat",
                 font=("Segoe UI", 10, "bold"),
-                command=lambda d=last_dest: _choose(d),
+                command=lambda d=_ld: _choose(d),  # type: ignore[misc]
             ).pack(fill="x", pady=(0, 4))
 
         for dest in self._destinations:

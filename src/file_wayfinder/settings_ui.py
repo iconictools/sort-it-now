@@ -16,7 +16,7 @@ import logging
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from file_wayfinder.autostart import is_autostart_enabled, set_autostart
 from file_wayfinder.themes import get_theme
@@ -57,7 +57,7 @@ def _build_general_tab(nb: ttk.Notebook, cfg: "Config", t: dict) -> dict:
     f = tk.Frame(nb, bg=t["bg"])
     nb.add(f, text="General")
 
-    pad = {"padx": (0, 8), "pady": 4}
+    pad: dict[str, Any] = {"padx": (0, 8), "pady": 4}
 
     # Theme
     _section(f, "Appearance", t).grid(row=0, column=0, columnspan=2, sticky="w", pady=(12, 4))
@@ -116,7 +116,7 @@ def _build_monitoring_tab(nb: ttk.Notebook, cfg: "Config", t: dict) -> dict:
     f = tk.Frame(nb, bg=t["bg"])
     nb.add(f, text="Monitoring")
 
-    pad = {"padx": (0, 8), "pady": 4}
+    pad: dict[str, Any] = {"padx": (0, 8), "pady": 4}
 
     _section(f, "File Detection", t).grid(row=0, column=0, columnspan=2, sticky="w", pady=(12, 4))
 
@@ -653,7 +653,7 @@ def _build_system_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) -> 
     f = tk.Frame(nb, bg=t["bg"])
     nb.add(f, text="System")
 
-    pad = {"padx": (0, 8), "pady": 4}
+    pad: dict[str, Any] = {"padx": (0, 8), "pady": 4}
 
     _section(f, "Startup", t).grid(row=0, column=0, columnspan=2, sticky="w", pady=(12, 4))
     _label(f, "Start on login:", t).grid(row=1, column=0, sticky="w", **pad)
@@ -751,7 +751,7 @@ class SettingsDialog:
 
         gen_vars = _build_general_tab(nb, cfg, t)
         mon_vars = _build_monitoring_tab(nb, cfg, t)
-        folder_vars = _build_folders_tab(nb, cfg, t, root)
+        _build_folders_tab(nb, cfg, t, root)
         _build_rules_tab(nb, cfg, t, root)
         sys_vars = _build_system_tab(nb, cfg, t, root)
 
@@ -763,9 +763,6 @@ class SettingsDialog:
                 settings[key] = var.get()
             # Monitoring
             for key, var in mon_vars.items():
-                settings[key] = var.get()
-            # Folder quick-add options
-            for key, var in folder_vars.items():
                 settings[key] = var.get()
             # System
             settings["batch_mode_style"] = sys_vars["batch_mode_style"].get()
