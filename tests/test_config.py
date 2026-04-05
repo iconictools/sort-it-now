@@ -24,7 +24,7 @@ class TestConfig:
         cfg = Config(self._path)
         cfg.add_monitored_folder("/tmp/downloads", ["/tmp/docs", "/tmp/images"])
         assert "/tmp/downloads" in cfg.monitored_folders
-        assert cfg.monitored_folders["/tmp/downloads"] == ["/tmp/docs", "/tmp/images"]
+        assert cfg.get_folder_destinations("/tmp/downloads") == ["/tmp/docs", "/tmp/images"]
 
     def test_remove_monitored_folder(self):
         cfg = Config(self._path)
@@ -53,7 +53,7 @@ class TestConfig:
         cfg = Config(self._path)
         cfg.add_monitored_folder("/tmp/test", ["/tmp/a"])
         cfg.set_destinations("/tmp/test", ["/tmp/b", "/tmp/c"])
-        assert cfg.monitored_folders["/tmp/test"] == ["/tmp/b", "/tmp/c"]
+        assert cfg.get_folder_destinations("/tmp/test") == ["/tmp/b", "/tmp/c"]
 
     def test_get_setting_default(self):
         cfg = Config(self._path)
@@ -72,3 +72,59 @@ class TestConfig:
         """Default auto-learn threshold should be 3 (Q5.1)."""
         cfg = Config(self._path)
         assert cfg.get_setting("auto_learn_threshold", 3) == 3
+
+    def test_per_folder_schema(self):
+        """Newly added folder should have all per-folder keys."""
+        cfg = Config(self._path)
+        cfg.add_monitored_folder("/tmp/test", ["/tmp/dest"])
+        entry = cfg.monitored_folders["/tmp/test"]
+        assert "destinations" in entry
+        assert "whitelist" in entry
+        assert "ignore_patterns" in entry
+        assert "extension_map" in entry
+        assert "label" in entry
+        assert "rename_patterns" in entry
+
+    def test_folder_label(self):
+        cfg = Config(self._path)
+        cfg.add_monitored_folder("/tmp/test", [])
+        assert cfg.get_folder_label("/tmp/test") == ""
+        cfg.set_folder_label("/tmp/test", "My Downloads")
+        assert cfg.get_folder_label("/tmp/test") == "My Downloads"
+
+    def test_folder_whitelist(self):
+        cfg = Config(self._path)
+        cfg.add_monitored_folder("/tmp/test", [])
+        cfg.add_to_folder_whitelist("/tmp/test", "*.log")
+        assert "*.log" in cfg.get_folder_whitelist("/tmp/test")
+        cfg.remove_from_folder_whitelist("/tmp/test", "*.log")
+        assert "*.log" not in cfg.get_folder_whitelist("/tmp/test")
+
+    def test_folder_extension_map(self):
+        cfg = Config(self._path)
+        cfg.add_monitored_folder("/tmp/test", [])
+        cfg.set_folder_extension_map("/tmp/test", {".pdf": "/tmp/docs"})
+        assert cfg.get_folder_extension_map("/tmp/test") == {".pdf": "/tmp/docs"}
+
+    def test_folder_rename_pattern(self):
+        cfg = Config(self._path)
+        cfg.add_monitored_folder("/tmp/test", [])
+        cfg.set_folder_setting("/tmp/test", "rename_patterns", [
+            {"extensions": [".pdf"], "pattern": "{date}_{name}", "enabled": True}
+        ])
+        assert cfg.get_folder_rename_pattern("/tmp/test", ".pdf") == "{date}_{name}"
+        assert cfg.get_folder_rename_pattern("/tmp/test", ".txt") is None
+
+    def test_migration_from_old_list_format(self):
+        """Old list-based monitored_folders should be migrated to dict format."""
+        import json
+        # Write an old-format config directly
+        with open(self._path, "w") as f:
+            json.dump({
+                "monitored_folders": {"/tmp/old": ["/tmp/dest"]},
+                "global_settings": {},
+                "ignore_patterns": [],
+            }, f)
+        cfg = Config(self._path)
+        assert isinstance(cfg.monitored_folders["/tmp/old"], dict)
+        assert cfg.get_folder_destinations("/tmp/old") == ["/tmp/dest"]

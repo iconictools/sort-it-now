@@ -1,6 +1,18 @@
 """Configuration management for File Wayfinder.
 
 Stores monitored folders, destination sets, and user preferences as JSON.
+
+Monitored folder schema (per-folder dict, migrated from old list format):
+    {
+        "/path": {
+            "destinations": ["/dest1", "/dest2"],
+            "whitelist": [],
+            "ignore_patterns": [],
+            "extension_map": {},
+            "label": "",
+            "rename_patterns": [],
+        }
+    }
 """
 
 from __future__ import annotations
@@ -16,6 +28,16 @@ from typing import Any
 from file_wayfinder.constants import DEFAULT_CONFIG_FILE
 
 logger = logging.getLogger(__name__)
+
+# Default per-folder settings structure
+_FOLDER_DEFAULTS: dict[str, Any] = {
+    "destinations": [],
+    "whitelist": [],
+    "ignore_patterns": [],
+    "extension_map": {},
+    "label": "",
+    "rename_patterns": [],
+}
 
 # Default configuration template
 _DEFAULT_CONFIG: dict[str, Any] = {
@@ -34,8 +56,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "pause_on_dnd": False,
         # Notifications
         "native_notifications": True,
-        # "plyer-only" | "toast-fallback" | "log-only"
-        "notification_fallback": "toast-fallback",
+        # "plyer-only" | "log-only"
+        "notification_fallback": "log-only",
         # Pattern rules
         "pattern_rules_enabled": True,
         # Duplicate detection
@@ -79,7 +101,8 @@ class Config:
         """Load configuration from disk, creating defaults if missing.
 
         If the file exists but contains invalid JSON, back it up and
-        reset to defaults.
+        reset to defaults.  Also migrates old per-folder list format to
+        the new per-folder dict format.
         """
         if os.path.exists(self.path):
             try:
@@ -102,6 +125,17 @@ class Config:
             self._data = json.loads(json.dumps(_DEFAULT_CONFIG))
             self.save()
 
+        # Migrate old monitored_folders format: {path: [list]} → {path: {dict}}
+        mf = self._data.get("monitored_folders", {})
+        migrated = False
+        for path, value in list(mf.items()):
+            if isinstance(value, list):
+                mf[path] = {**_FOLDER_DEFAULTS, "destinations": value}
+                migrated = True
+        if migrated:
+            logger.info("Migrated monitored_folders to per-folder dict format.")
+            self.save()
+
     def save(self) -> None:
         """Persist current configuration to disk (atomic write)."""
         dir_path = os.path.dirname(self.path) or "."
@@ -116,8 +150,8 @@ class Config:
     # ------------------------------------------------------------------
 
     @property
-    def monitored_folders(self) -> dict[str, list[str]]:
-        """Return ``{folder_path: [destination, ...]}`` mapping."""
+    def monitored_folders(self) -> dict[str, dict[str, Any]]:
+        """Return ``{folder_path: {per-folder settings}}`` mapping."""
         return self._data.get("monitored_folders", {})
 
     def add_monitored_folder(
@@ -126,7 +160,10 @@ class Config:
         """Register *folder* for monitoring with optional *destinations*."""
         folder = os.path.abspath(folder)
         if folder not in self._data["monitored_folders"]:
-            self._data["monitored_folders"][folder] = destinations or []
+            self._data["monitored_folders"][folder] = {
+                **_FOLDER_DEFAULTS,
+                "destinations": destinations or [],
+            }
             self.save()
 
     def remove_monitored_folder(self, folder: str) -> None:
@@ -138,7 +175,89 @@ class Config:
     def set_destinations(self, folder: str, destinations: list[str]) -> None:
         """Set destination folders for a monitored *folder*."""
         folder = os.path.abspath(folder)
-        self._data["monitored_folders"][folder] = destinations
+        mf = self._data["monitored_folders"]
+        if folder not in mf:
+            mf[folder] = {**_FOLDER_DEFAULTS}
+        mf[folder]["destinations"] = destinations
+        self.save()
+
+    # ------------------------------------------------------------------
+    # Per-folder helpers
+    # ------------------------------------------------------------------
+
+    def _folder_data(self, folder: str) -> dict[str, Any]:
+        """Return the per-folder settings dict, auto-creating if absent."""
+        folder = os.path.abspath(folder)
+        mf = self._data.setdefault("monitored_folders", {})
+        if folder not in mf:
+            mf[folder] = {**_FOLDER_DEFAULTS}
+        entry = mf[folder]
+        # Fill in any missing keys from defaults (forward-compat)
+        for k, v in _FOLDER_DEFAULTS.items():
+            if k not in entry:
+                import copy
+                entry[k] = copy.deepcopy(v)
+        return entry
+
+    def get_folder_destinations(self, folder: str) -> list[str]:
+        """Return the destination list for *folder*."""
+        return self._folder_data(folder).get("destinations", [])
+
+    def get_folder_whitelist(self, folder: str) -> list[str]:
+        """Return the per-folder whitelist glob patterns."""
+        return self._folder_data(folder).get("whitelist", [])
+
+    def add_to_folder_whitelist(self, folder: str, pattern: str) -> None:
+        """Add a glob pattern to the per-folder whitelist."""
+        wl = self._folder_data(folder).setdefault("whitelist", [])
+        if pattern not in wl:
+            wl.append(pattern)
+            self.save()
+
+    def remove_from_folder_whitelist(self, folder: str, pattern: str) -> None:
+        """Remove a glob pattern from the per-folder whitelist."""
+        wl = self._folder_data(folder).get("whitelist", [])
+        if pattern in wl:
+            wl.remove(pattern)
+            self.save()
+
+    def get_folder_extension_map(self, folder: str) -> dict[str, str]:
+        """Return the per-folder extension→destination map."""
+        return self._folder_data(folder).get("extension_map", {})
+
+    def set_folder_extension_map(
+        self, folder: str, ext_map: dict[str, str]
+    ) -> None:
+        """Set the per-folder extension→destination map."""
+        self._folder_data(folder)["extension_map"] = ext_map
+        self.save()
+
+    def get_folder_label(self, folder: str) -> str:
+        """Return the human-readable label for *folder*."""
+        return self._folder_data(folder).get("label", "")
+
+    def set_folder_label(self, folder: str, label: str) -> None:
+        """Set the human-readable label for *folder*."""
+        self._folder_data(folder)["label"] = label
+        self.save()
+
+    def get_folder_rename_patterns(self, folder: str) -> list[dict[str, Any]]:
+        """Return the list of per-folder rename pattern dicts."""
+        return self._folder_data(folder).get("rename_patterns", [])
+
+    def get_folder_rename_pattern(self, folder: str, ext: str) -> str | None:
+        """Return the rename pattern string for *ext* in *folder*, or *None*."""
+        ext = ext.lower()
+        for entry in self.get_folder_rename_patterns(folder):
+            if not entry.get("enabled", True):
+                continue
+            if ext in entry.get("extensions", []):
+                return entry.get("pattern")
+        return None
+
+    def set_folder_setting(self, folder: str, key: str, value: Any) -> None:
+        """Set an arbitrary per-folder setting by *key*."""
+        self._folder_data(folder)[key] = value
         self.save()
 
     # ------------------------------------------------------------------

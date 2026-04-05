@@ -226,8 +226,8 @@ def show_batch_list(
     dest_vars: list[tuple[str, tk.StringVar]] = []
 
     all_dests: list[str] = []
-    for dests in config.monitored_folders.values():
-        for d in dests:
+    for folder in config.monitored_folders:
+        for d in config.get_folder_destinations(folder):
             if d not in all_dests:
                 all_dests.append(d)
 

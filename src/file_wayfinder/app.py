@@ -214,8 +214,8 @@ class App:
         # Destination folders are whitelisted by the program so that files
         # already sorted into them are never re-prompted.
         parent = os.path.dirname(os.path.abspath(filepath))
-        for dests in self.config.monitored_folders.values():
-            for dest in dests:
+        for folder, folder_cfg in self.config.monitored_folders.items():
+            for dest in folder_cfg.get("destinations", []):
                 if os.path.abspath(dest) == parent:
                     logger.debug(
                         "In destination folder, skipping: %s", filepath,
@@ -253,13 +253,13 @@ class App:
 
         # Determine which monitored folder this file belongs to
         parent = os.path.dirname(os.path.abspath(filepath))
-        destinations = self.config.monitored_folders.get(parent, [])
+        destinations = self.config.get_folder_destinations(parent)
         if not destinations:
             # Try to find a matching monitored folder (with proper path check)
-            for mf, dests in self.config.monitored_folders.items():
+            for mf in self.config.monitored_folders:
                 mf_abs = os.path.abspath(mf)
                 if parent == mf_abs or parent.startswith(mf_abs + os.sep):
-                    destinations = dests
+                    destinations = self.config.get_folder_destinations(mf)
                     break
 
         if not destinations:
@@ -543,7 +543,7 @@ class App:
 
         # Resolve destinations
         if inherit:
-            dests = list(self.config.monitored_folders.get(parent_monitored, []))
+            dests = list(self.config.get_folder_destinations(parent_monitored))
         else:
             # Open a destination picker
             import tkinter as tk

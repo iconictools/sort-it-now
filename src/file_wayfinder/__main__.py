@@ -21,6 +21,7 @@ import argparse  # noqa: E402
 import logging  # noqa: E402
 import logging.handlers  # noqa: E402
 import os  # noqa: E402
+import shutil  # noqa: E402
 
 from file_wayfinder import __version__  # noqa: E402
 from file_wayfinder.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE  # noqa: E402
@@ -79,6 +80,22 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     _setup_logging(args.verbose)
+
+    # ── Auto-migrate old config dir ───────────────────────────────────
+    _old_dir = os.path.join(os.path.expanduser("~"), ".sort-it-now")
+    _new_dir = DEFAULT_CONFIG_DIR
+    if os.path.isdir(_old_dir) and not os.path.exists(
+        os.path.join(_new_dir, "config.json")
+    ):
+        try:
+            shutil.copytree(_old_dir, _new_dir, dirs_exist_ok=True)
+            logging.getLogger(__name__).info(
+                "Auto-migrated config from %s to %s", _old_dir, _new_dir
+            )
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(
+                "Could not migrate old config: %s", _exc
+            )
 
     from file_wayfinder.config import Config
     from file_wayfinder.app import App

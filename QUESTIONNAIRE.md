@@ -325,7 +325,7 @@ directory exists? Or start fresh?
 (b) Start fresh — no migration
 (c) Prompt the user to choose
 
-→ **Answer:**
+→ **Answer:** **(a)** Auto-migrate on first run. If `~/.sort-it-now/config.json` exists and `~/.file-wayfinder/config.json` does not, copy the old directory to the new one silently and log it.
 
 ---
 
@@ -341,7 +341,7 @@ back to logging.
 (b) Just log it (current behavior)
 (c) Show a transient tkinter label that auto-dismisses after 3 seconds
 
-→ **Answer:**
+→ **Answer:** **(b)** Just log it. No popup fallback — keep it clean.
 
 ---
 
@@ -357,7 +357,7 @@ auto-rules are checked first.
 (b) Auto-learned first, then pattern rules (current behavior)
 (c) Let the user configure the priority order in settings
 
-→ **Answer:**
+→ **Answer:** **(a)** Pattern rules first. Note: auto-learn rules have been removed entirely from the codebase — only pattern rules remain.
 
 ---
 
@@ -372,7 +372,7 @@ errors. There's no lock file or single-instance check.
 (a) Yes — show a message and exit if already running
 (b) No — it's fine for personal use
 
-→ **Answer:**
+→ **Answer:** Already implemented! Launching the app twice prompts the user whether to add a new folder to the running instance (merging into one) or start an independent second instance. Multi-instance collaboration is automatic and user-directed.
 
 ---
 
@@ -388,7 +388,7 @@ be detected.
 (b) Keep it non-recursive only
 (c) Make it a global setting
 
-→ **Answer:**
+→ **Answer:** **(b)** Keep it non-recursive only. If a subfolder needs monitoring, the user should add it explicitly via the tray menu or settings.
 
 ---
 
@@ -405,7 +405,7 @@ Useful for servers or running in the background without a desktop.
 (a) Yes — add a `--headless` mode
 (b) No — GUI-only is fine
 
-→ **Answer:**
+→ **Answer:** **(b)** GUI-only. This is a user-facing desktop app, not a server tool.
 
 ---
 
@@ -421,7 +421,7 @@ most-used destinations, average files per day.
 (b) Add detailed analytics (charts, trends, breakdown by type)
 (c) Add a simple weekly summary notification
 
-→ **Answer:**
+→ **Answer:** Per-user taxonomy analytics. Statistics should be shaped by how each user organises files — track breakdowns by extension, destination, and time of day. Since taxonomy varies per user, analytics should adapt and highlight the user's own patterns rather than generic counts.
 
 ---
 
@@ -437,7 +437,7 @@ a proper icon.
 (b) Create a more distinctive compass/waypoint-themed icon in code
 (c) You'll provide an icon file later
 
-→ **Answer:**
+→ **Answer:** **(b)** Compass/waypoint-themed icon drawn in code. The tray icon must display the number of folders being watched by that instance in the tooltip.
 
 ---
 
@@ -453,7 +453,7 @@ undo the rename.
 (a) Yes — full undo including name restoration
 (b) No — just move it back (current behavior)
 
-→ **Answer:**
+→ **Answer:** Ask the user. When a rename occurred during the move, prompt whether to also restore the original filename. Already implemented as `"undo_restore_name": "ask"`.
 
 ---
 
@@ -474,6 +474,18 @@ undo the rename.
 
 → **Ratings:**
 
+- Drag-and-drop sort: **4** — If multiple folders are watched, ask the user which folder context to use
+- Keyboard shortcuts in sort prompt: **1** — don't care
+- Tagging system: **1** — don't care
+- Search across sorted files: **(not rated)**
+- Undo for accumulated unsorted / unbound items: **maybe** — a log/undo system with unbound items (optimal log-based approach)
+- Scheduled cleanup reminders: **M** — yes, can work for files on timeout / still unsorted
+- Cloud sync: **N** — no
+- Plugins/extensions API: **N** — no
+- File type learning from content: **N** — no
+- Right-click context menu: **N** — no. The sort prompt already has an editable name field ("rename" button)
+- Batch rename tool: **N** — no
+
 ---
 
 ### D12. Testing Strategy
@@ -489,7 +501,7 @@ rules, and more. Missing: integration tests that test the full flow
 (b) Unit tests are sufficient for now
 (c) Add integration tests but only for the critical path
 
-→ **Answer:**
+→ **Answer:** **(c)** Integration tests for the critical path only (file detected → move → history recorded).
 
 ---
 
@@ -506,4 +518,4 @@ user guide, FAQ, or contributing guide.
 (d) All of the above
 (e) README is sufficient
 
-→ **Answer:**
+→ **Answer:** **(d)** All of the above — go thorough. User guide, FAQ, contributing guide.

@@ -222,7 +222,7 @@ def _build_folders_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) ->
         dest_list.delete(0, "end")
         if not _selected_folder:
             return
-        for d in cfg.monitored_folders.get(_selected_folder[0], []):
+        for d in cfg.get_folder_destinations(_selected_folder[0]):
             dest_list.insert("end", d)
 
     def _on_watch_select(event: object = None) -> None:  # noqa: ARG001
@@ -280,7 +280,7 @@ def _build_folders_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) ->
         if not dest:
             return
         dest = os.path.abspath(dest)
-        current = list(cfg.monitored_folders.get(folder, []))
+        current = list(cfg.get_folder_destinations(folder))
         if dest in current:
             messagebox.showinfo("Already added", f"Already a destination:\n{dest}", parent=root)
             return
@@ -296,7 +296,7 @@ def _build_folders_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) ->
             return
         folder = _selected_folder[0]
         dest = dest_list.get(sel[0])
-        current = list(cfg.monitored_folders.get(folder, []))
+        current = list(cfg.get_folder_destinations(folder))
         if dest in current:
             current.remove(dest)
             cfg.set_destinations(folder, current)
