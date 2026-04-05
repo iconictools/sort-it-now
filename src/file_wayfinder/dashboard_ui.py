@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 import threading
 import time
 import tkinter as tk
@@ -104,7 +105,7 @@ def show_dashboard(
                 dest_tax_frame, text=dest_str,
                 bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
             ).pack(side="left", padx=(6, 0))
-    except Exception:
+    except (sqlite3.Error, OSError, AttributeError):
         logger.debug("Taxonomy stats unavailable", exc_info=True)
 
     # -- Inbox Zero progress --
@@ -143,7 +144,7 @@ def show_dashboard(
         if os.path.exists(rules_path):
             tmp_rules = Rules(rules_path)
             rules_count = len(tmp_rules.extension_map)
-    except Exception:
+    except (OSError, AttributeError):
         pass
 
     tk.Label(

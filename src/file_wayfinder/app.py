@@ -212,7 +212,7 @@ class App:
     def _cleanup_reminder_loop(self) -> None:
         """Background daemon: notify when a monitored folder has too many files."""
         notified_folders: set[str] = set()
-        while not self._stop_event.wait(60):
+        while not self._stop_event.wait(30):
             threshold = self.config.get_setting("cleanup_reminder_threshold", 0)
             if not threshold:
                 notified_folders.clear()

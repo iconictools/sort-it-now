@@ -195,7 +195,7 @@ class SortPrompt:
         )
         rename_entry.pack(side="left", fill="x", expand=True, padx=(4, 0))
 
-        def _select_filename_stem(event: object = None) -> None:  # noqa: ARG001
+        def _select_filename_stem(_event: object = None) -> None:
             rename_entry.selection_range(0, len(name_without_ext))
 
         rename_entry.bind("<FocusIn>", _select_filename_stem)
