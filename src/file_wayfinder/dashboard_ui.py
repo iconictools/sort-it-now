@@ -63,6 +63,50 @@ def show_dashboard(
         bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 10),
     ).pack(anchor="w")
 
+    # -- File type / destination taxonomy stats --
+    try:
+        rows = history._conn.execute(
+            "SELECT src_path, dst_path FROM actions WHERE undone=0"
+        ).fetchall()
+        ext_counts: dict[str, int] = {}
+        dest_counts: dict[str, int] = {}
+        for src_path, dst_path in rows:
+            _, ext = os.path.splitext(src_path)
+            if ext:
+                ext_lower = ext.lower()
+                ext_counts[ext_lower] = ext_counts.get(ext_lower, 0) + 1
+            dest_name = os.path.basename(os.path.dirname(dst_path))
+            if dest_name:
+                dest_counts[dest_name] = dest_counts.get(dest_name, 0) + 1
+        if ext_counts:
+            top_exts = sorted(ext_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            ext_str = "  ".join(f"{e}×{c}" for e, c in top_exts)
+            tax_frame = tk.Frame(root, bg=theme["bg"])
+            tax_frame.pack(fill="x", padx=24, pady=(4, 0))
+            tk.Label(
+                tax_frame, text="Top file types:",
+                bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
+            ).pack(side="left")
+            tk.Label(
+                tax_frame, text=ext_str,
+                bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
+            ).pack(side="left", padx=(6, 0))
+        if dest_counts:
+            top_dests = sorted(dest_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            dest_str = "  ".join(f"{d}×{c}" for d, c in top_dests)
+            dest_tax_frame = tk.Frame(root, bg=theme["bg"])
+            dest_tax_frame.pack(fill="x", padx=24, pady=(2, 0))
+            tk.Label(
+                dest_tax_frame, text="Top destinations:",
+                bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
+            ).pack(side="left")
+            tk.Label(
+                dest_tax_frame, text=dest_str,
+                bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
+            ).pack(side="left", padx=(6, 0))
+    except Exception:
+        pass
+
     # -- Inbox Zero progress --
     if pending > 0 or today > 0:
         progress_frame = tk.Frame(root, bg=theme["bg"])

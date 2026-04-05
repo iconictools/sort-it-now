@@ -93,6 +93,7 @@ class App:
         self._focus_mode = self.config.get_setting("focus_mode", False)
         self._batch_queue: list[str] = []
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
 
         self.watcher = FolderWatcher(
             callback=self._on_file_detected,
@@ -160,6 +161,11 @@ class App:
         logger.info("File Wayfinder is running.")
         self._ipc_server.start()
         self._update_tray_monitored_count()
+        # Start background cleanup-reminder polling thread
+        cleanup_thread = threading.Thread(
+            target=self._cleanup_reminder_loop, daemon=True
+        )
+        cleanup_thread.start()
         # Tray icon runs on the main thread (required by OS)
         try:
             self.tray.start()
@@ -198,9 +204,46 @@ class App:
 
     def _quit(self) -> None:
         logger.info("Shutting down...")
+        self._stop_event.set()
         self._ipc_server.stop()
         self.watcher.stop()
         self.history.close()
+
+    def _cleanup_reminder_loop(self) -> None:
+        """Background daemon: notify when a monitored folder has too many files."""
+        notified_folders: set[str] = set()
+        while not self._stop_event.wait(60):
+            threshold = self.config.get_setting("cleanup_reminder_threshold", 0)
+            if not threshold:
+                notified_folders.clear()
+                continue
+            for folder in list(self.config.monitored_folders):
+                if not os.path.isdir(folder):
+                    continue
+                try:
+                    count = sum(
+                        1 for name in os.listdir(folder)
+                        if os.path.isfile(os.path.join(folder, name))
+                        and not any(
+                            fnmatch.fnmatch(name, pat)
+                            for pat in self.config.ignore_patterns
+                        )
+                    )
+                except OSError:
+                    continue
+                if count >= threshold:
+                    if folder not in notified_folders:
+                        folder_name = os.path.basename(folder)
+                        notify(
+                            "Cleanup reminder",
+                            f"{count} unsorted files in {folder_name}",
+                        )
+                        logger.info(
+                            "Cleanup reminder: %d files in %s", count, folder
+                        )
+                        notified_folders.add(folder)
+                else:
+                    notified_folders.discard(folder)
 
     # ------------------------------------------------------------------
     # File event handling
@@ -254,20 +297,40 @@ class App:
         # Determine which monitored folder this file belongs to
         parent = os.path.dirname(os.path.abspath(filepath))
         destinations = self.config.get_folder_destinations(parent)
+        parent_monitored: str | None = None
         if not destinations:
             # Try to find a matching monitored folder (with proper path check)
             for mf in self.config.monitored_folders:
                 mf_abs = os.path.abspath(mf)
                 if parent == mf_abs or parent.startswith(mf_abs + os.sep):
                     destinations = self.config.get_folder_destinations(mf)
+                    parent_monitored = mf
                     break
+        else:
+            parent_monitored = parent
 
         if not destinations:
             logger.debug("No destinations configured for %s", filepath)
             return
 
+        # Merge global and per-folder extension maps (per-folder takes priority)
+        lookup_folder = parent_monitored or parent
+        folder_ext_map = self.config.get_folder_extension_map(lookup_folder)
+        if folder_ext_map:
+            merged_ext_map = {**self.rules.extension_map, **folder_ext_map}
+        else:
+            merged_ext_map = self.rules.extension_map
+
+        # Check per-folder extension map as an auto-rule override
+        _, file_ext = os.path.splitext(filepath)
+        if file_ext and file_ext.lower() in folder_ext_map:
+            auto_dest = folder_ext_map[file_ext.lower()]
+            if os.path.isdir(auto_dest):
+                self._move_file(filepath, auto_dest)
+                return
+
         ordered = suggest_destinations(
-            filepath, destinations, self.rules.extension_map
+            filepath, destinations, merged_ext_map
         )
 
         theme_name = self.config.get_setting("theme", "dark")

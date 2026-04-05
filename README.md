@@ -175,3 +175,64 @@ ruff check src/ tests/
 ## License
 
 MIT
+
+---
+
+## User Guide
+
+### Getting Started
+
+1. **First launch — Setup Wizard**  
+   On the very first run, the Setup Wizard opens and asks you to choose one or more folders to watch (e.g. `Downloads`) and one or more destination folders for each watched folder (e.g. `Documents`, `Pictures`, `Work`). You can add more folders at any time from the tray menu or **Settings → Folders**.
+
+2. **The sort prompt**  
+   Whenever a new file lands in a watched folder, a non-intrusive popup appears showing the file name, size, and a preview (image thumbnail, text snippet, or type label). You can:
+   - Click a destination button to move the file there immediately.
+   - Edit the **✎ Rename:** field to give the file a new name before moving it (the stem is pre-selected on focus so you can start typing right away).
+   - Tick **Always send `<ext>` files here** to create an auto-rule for that extension.
+   - Click **Add to whitelist** to permanently ignore this file.
+   - Click **Ignore** to dismiss without moving.
+
+3. **Focus mode**  
+   Focus mode queues all incoming files instead of showing prompts. The tray icon turns red and displays a badge with the pending count. Toggle focus mode from the tray context menu. When you turn it off the queue is processed according to the **batch mode style** setting (one-by-one or batch list).
+
+4. **Rules**  
+   - **Extension auto-rules**: tick "Always send here" in the sort prompt to create an auto-rule. After three consistent choices for the same extension, the rule fires automatically.
+   - **Pattern rules** (glob/regex): open **Tray → Manage Rules** to create explicit rules that match filenames and route them to a destination without prompting.
+   - **Per-folder extension map**: in **Settings → Folders**, select a watched folder and configure per-folder extension overrides that take priority over the global rules.
+
+5. **Dashboard**  
+   Open the dashboard from the tray menu to see:
+   - Pending files in the queue (focus mode).
+   - Sorting stats: total, today, this week.
+   - Top file types and top destinations (derived from your sort history).
+   - Inbox Zero progress bar for today's activity.
+   - Clickable undo history — select any action and click **Undo to selected** to roll back up to that point.
+
+6. **Settings**  
+   The settings dialog has five tabs:
+   - **General** — theme (dark/light), notifications, undo behaviour, multi-instance handling.
+   - **Monitoring** — prompt delay, scan existing files, catch new sub-folders, DND pause, pattern rules toggle, duplicate detection, cleanup reminder threshold.
+   - **Folders** — add/remove watched folders, manage per-folder destinations, set a folder label, and configure a per-folder whitelist.
+   - **Rules** — global whitelist patterns, watcher ignore patterns, and auto-rename patterns.
+   - **System** — login autostart, batch mode style, and config export/import.
+
+---
+
+## FAQ
+
+**Q: A file appeared in my watched folder but I wasn't prompted.**  
+A: Check three things: (1) the file name may match a pattern in **Settings → Rules → Whitelist** or the per-folder whitelist for that folder; (2) the file landed inside a configured *destination* folder, which is always skipped to prevent re-sorting already-sorted files; (3) the file name matches an ignore pattern in **Settings → Rules → Ignore Patterns** (e.g. `~$*` for Office temp files).
+
+**Q: The app stopped watching a folder.**  
+A: The folder may have been removed or unmounted. File Wayfinder logs a warning at startup when a monitored folder no longer exists. Re-add it in **Settings → Folders → + Watch** or via **Tray → Add folder to watch...** and the watcher will resume.
+
+**Q: How do I undo a move?**  
+A: You have two options. From the tray: click **Undo last** to reverse the most recent action. From the dashboard: open **Tray → Dashboard**, select any action in the history list, then click **Undo to selected** to roll back all actions up to and including the selected one.
+
+**Q: Can I move files automatically without prompts?**  
+A: Yes — two mechanisms skip the prompt entirely. (1) **Explicit pattern rules** (glob or regex): create them in **Tray → Manage Rules**; any file whose name matches is moved immediately. (2) **Extension auto-rules**: after you choose the same destination for a given extension three times and tick "Always send here", subsequent files of that extension are moved automatically. Per-folder extension maps (configured in **Settings → Folders**) also fire silently.
+
+**Q: Files in my Downloads folder aren't triggering prompts.**  
+A: Make sure `Downloads` appears in **Settings → Folders → Watched folders**. If it does, check that it isn't also listed as a *destination* for itself (destination folders are skipped). Also verify that the file extension isn't matched by a whitelist or ignore pattern, and that focus mode is not active (the tray icon would be red with a badge if it is).
+

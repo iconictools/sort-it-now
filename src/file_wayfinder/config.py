@@ -75,6 +75,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "quick_add_inherit_destinations": True,
         "quick_add_auto_whitelist": True,
         "quick_add_auto_start_watch": True,
+        # Cleanup reminders: 0 = disabled, N = alert when folder has >= N files
+        "cleanup_reminder_threshold": 0,
     },
     "ignore_patterns": [
         "~$*",

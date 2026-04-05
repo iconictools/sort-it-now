@@ -18,17 +18,20 @@ def _create_icon_image(
     size: int = 64,
     badge_count: int = 0,
 ) -> Image.Image:
-    """Draw a simple folder-shaped tray icon with optional badge."""
+    """Draw a compass/waypoint tray icon with optional badge."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # Folder body
-    draw.rounded_rectangle(
-        [4, 16, size - 4, size - 8], radius=6, fill=color
+    # Compass ring
+    margin = 4
+    draw.ellipse(
+        [margin, margin, size - margin, size - margin],
+        outline=color, width=4,
     )
-    # Folder tab
-    draw.rounded_rectangle(
-        [4, 10, size // 2, 22], radius=4, fill=color
-    )
+    # Waypoint diamond marker in the center
+    cx, cy = size // 2, size // 2
+    r = size // 5
+    points = [(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)]
+    draw.polygon(points, fill=color)
     # Badge with pending count
     if badge_count > 0:
         badge_r = 14

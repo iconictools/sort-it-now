@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: ["*"]
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -90,3 +91,21 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/
           retention-days: 30
+
+  release:
+    name: Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-all/
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist-all/**
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

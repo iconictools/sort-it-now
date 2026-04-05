@@ -182,15 +182,23 @@ class SortPrompt:
         rename_frame = tk.Frame(root, bg=t["bg"])
         rename_frame.pack(fill="x", padx=24, pady=(0, 4))
         tk.Label(
-            rename_frame, text="Name:",
+            rename_frame, text="✎ Rename:",
             bg=t["bg"], fg=t["fg"], font=("Segoe UI", 9),
         ).pack(side="left")
         rename_var = tk.StringVar(value=basename)
+        name_without_ext, _ = os.path.splitext(basename)
+        # Use a slightly distinct background to signal editability
+        rename_bg = t.get("accent_muted", t["list_bg"])
         rename_entry = tk.Entry(
             rename_frame, textvariable=rename_var,
-            bg=t["entry_bg"], fg=t["entry_fg"], font=("Segoe UI", 9),
+            bg=rename_bg, fg=t["entry_fg"], font=("Segoe UI", 9),
         )
         rename_entry.pack(side="left", fill="x", expand=True, padx=(4, 0))
+
+        def _select_stem(event: object = None) -> None:  # noqa: ARG001
+            rename_entry.selection_range(0, len(name_without_ext))
+
+        rename_entry.bind("<FocusIn>", _select_stem)
 
         tk.Label(
             root,

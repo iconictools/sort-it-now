@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from typing import TYPE_CHECKING
 
 from file_wayfinder.autostart import is_autostart_enabled, set_autostart
@@ -148,6 +148,17 @@ def _build_monitoring_tab(nb: ttk.Notebook, cfg: "Config", t: dict) -> dict:
     dup_var = tk.BooleanVar(value=cfg.get_setting("duplicate_detection", False))
     _check(f, "Enabled", dup_var, t).grid(row=7, column=1, sticky="w", **pad)
 
+    _section(f, "Cleanup Reminders", t).grid(row=8, column=0, columnspan=2, sticky="w", pady=(12, 4))
+    _label(
+        f,
+        "Cleanup reminder (0=off, N=alert when folder has ≥N unsorted files):",
+        t,
+    ).grid(row=9, column=0, sticky="w", **pad)
+    cleanup_var = tk.IntVar(value=cfg.get_setting("cleanup_reminder_threshold", 0))
+    tk.Spinbox(f, from_=0, to=9999, increment=1, textvariable=cleanup_var, width=6,
+               bg=t["entry_bg"], fg=t["entry_fg"], font=("Segoe UI", 10)).grid(
+        row=9, column=1, sticky="w", **pad)
+
     f.columnconfigure(1, weight=1)
     return {
         "prompt_delay_seconds": delay_var,
@@ -156,6 +167,7 @@ def _build_monitoring_tab(nb: ttk.Notebook, cfg: "Config", t: dict) -> dict:
         "pause_on_dnd": dnd_var,
         "pattern_rules_enabled": pattern_var,
         "duplicate_detection": dup_var,
+        "cleanup_reminder_threshold": cleanup_var,
     }
 
 
@@ -337,6 +349,101 @@ def _build_folders_tab(nb: ttk.Notebook, cfg: "Config", t: dict, root: tk.Tk) ->
     _check(qa_frame, "Start watching immediately", qa_watch, t).grid(
         row=4, column=0, columnspan=2, sticky="w", pady=2
     )
+
+    # ── Per-folder label + whitelist ────────────────────────────────────
+    sep2 = tk.Frame(f, height=1, bg=t["btn_bg"])
+    sep2.grid(row=5, column=0, columnspan=3, sticky="ew", padx=8, pady=6)
+
+    detail_frame = tk.Frame(f, bg=t["bg"])
+    detail_frame.grid(row=6, column=0, columnspan=3, sticky="ew", padx=8, pady=(0, 4))
+    f.rowconfigure(6, weight=0)
+
+    _section(detail_frame, "Per-Folder Details", t).grid(
+        row=0, column=0, columnspan=4, sticky="w", pady=(4, 4)
+    )
+
+    # Folder Label
+    tk.Label(detail_frame, text="Folder Label:", bg=t["bg"], fg=t["fg"],
+             font=("Segoe UI", 10)).grid(row=1, column=0, sticky="w", padx=(0, 6), pady=2)
+    folder_label_var = tk.StringVar(value="")
+    folder_label_entry = tk.Entry(
+        detail_frame, textvariable=folder_label_var,
+        bg=t["entry_bg"], fg=t["entry_fg"], font=("Segoe UI", 10), width=36,
+    )
+    folder_label_entry.grid(row=1, column=1, columnspan=3, sticky="ew", pady=2)
+
+    # Per-folder whitelist
+    tk.Label(detail_frame, text="Per-folder whitelist:", bg=t["bg"], fg=t["fg"],
+             font=("Segoe UI", 10)).grid(row=2, column=0, sticky="nw", padx=(0, 6), pady=2)
+    pfwl_list = tk.Listbox(
+        detail_frame, bg=t["list_bg"], fg=t["list_fg"],
+        selectbackground=t["list_select_bg"], selectforeground=t["list_select_fg"],
+        font=("Segoe UI", 9), relief="flat", height=4, width=36,
+    )
+    pfwl_list.grid(row=2, column=1, columnspan=3, sticky="ew", pady=2)
+    pfwl_btn = tk.Frame(detail_frame, bg=t["bg"])
+    pfwl_btn.grid(row=3, column=1, columnspan=3, sticky="w", pady=(2, 4))
+
+    def _pfwl_add() -> None:
+        if not _selected_folder:
+            return
+        pat = simpledialog.askstring(
+            "Add whitelist pattern",
+            "Enter a glob pattern (e.g. *.log):",
+            parent=root,
+        )
+        if pat and pat.strip():
+            cfg.add_to_folder_whitelist(_selected_folder[0], pat.strip())
+            pfwl_list.insert("end", pat.strip())
+
+    def _pfwl_remove() -> None:
+        if not _selected_folder:
+            return
+        sel = pfwl_list.curselection()
+        if not sel:
+            return
+        item = pfwl_list.get(sel[0])
+        cfg.remove_from_folder_whitelist(_selected_folder[0], item)
+        pfwl_list.delete(sel[0])
+
+    tk.Button(pfwl_btn, text="+ Add", bg=t["accent"], fg=t["bg"],
+              font=("Segoe UI", 9, "bold"), relief="flat",
+              command=_pfwl_add).pack(side="left", padx=(0, 4))
+    tk.Button(pfwl_btn, text="- Remove", bg=t["danger"], fg="#ffffff",
+              font=("Segoe UI", 9, "bold"), relief="flat",
+              command=_pfwl_remove).pack(side="left")
+
+    # Track label changes and write to config
+    _label_trace_active: list[bool] = [False]
+
+    def _on_label_write(*_: object) -> None:
+        if _label_trace_active[0] and _selected_folder:
+            cfg.set_folder_label(_selected_folder[0], folder_label_var.get())
+
+    folder_label_var.trace_add("write", _on_label_write)
+
+    def _refresh_per_folder_details() -> None:
+        """Update label and whitelist widgets when the selected folder changes."""
+        _label_trace_active[0] = False
+        pfwl_list.delete(0, "end")
+        if not _selected_folder:
+            folder_label_var.set("")
+            _label_trace_active[0] = True
+            return
+        folder = _selected_folder[0]
+        folder_label_var.set(cfg.get_folder_label(folder))
+        for pat in cfg.get_folder_whitelist(folder):
+            pfwl_list.insert("end", pat)
+        _label_trace_active[0] = True
+
+    # Patch _on_watch_select to also refresh per-folder details
+    original_on_watch_select = _on_watch_select
+
+    def _on_watch_select_extended(event: object = None) -> None:
+        original_on_watch_select(event)
+        _refresh_per_folder_details()
+
+    watch_list.bind("<<ListboxSelect>>", _on_watch_select_extended)
 
     # Return the quick-add vars so _save() can persist them
     return {  # type: ignore[return-value]
