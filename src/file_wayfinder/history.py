@@ -29,16 +29,21 @@ class History:
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)
+        try:
+            self._conn.execute("ALTER TABLE actions ADD COLUMN source_folder TEXT")
+            self._conn.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
     # ------------------------------------------------------------------
     # Recording
     # ------------------------------------------------------------------
 
-    def record(self, src_path: str, dst_path: str) -> int:
+    def record(self, src_path: str, dst_path: str, source_folder: str | None = None) -> int:
         """Record a file move and return the action id."""
         cur = self._conn.execute(
-            "INSERT INTO actions (timestamp, src_path, dst_path) VALUES (?, ?, ?)",
-            (time.time(), src_path, dst_path),
+            "INSERT INTO actions (timestamp, src_path, dst_path, source_folder) VALUES (?, ?, ?, ?)",
+            (time.time(), src_path, dst_path, source_folder),
         )
         self._conn.commit()
         self._prune()

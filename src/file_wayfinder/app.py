@@ -10,6 +10,7 @@ import shutil
 import sys
 import threading
 
+from file_wayfinder.achievements import Achievements
 from file_wayfinder.classifier import suggest_destinations
 from file_wayfinder.config import Config
 from file_wayfinder.conflict_ui import resolve_conflict
@@ -94,6 +95,11 @@ class App:
         self._batch_queue: list[str] = []
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
+        self._health_notified: set[str] = set()
+
+        self.achievements = Achievements(
+            os.path.join(os.path.dirname(self.config.path), "achievements.db")
+        )
 
         self.watcher = FolderWatcher(
             callback=self._on_file_detected,
@@ -107,6 +113,7 @@ class App:
             on_open_settings=self._show_settings,
             on_open_rules=self._show_rules,
             on_add_folder=self._add_folder_via_tray,
+            on_sort_file=self._sort_file_via_tray,
             on_quit=self._quit,
         )
         self._ipc_server = IPCServer(on_command=self._handle_ipc_command)
@@ -166,6 +173,11 @@ class App:
             target=self._cleanup_reminder_loop, daemon=True
         )
         cleanup_thread.start()
+        # Start background folder health monitor thread
+        health_thread = threading.Thread(
+            target=self._folder_health_loop, daemon=True
+        )
+        health_thread.start()
         # Tray icon runs on the main thread (required by OS)
         try:
             self.tray.start()
@@ -208,6 +220,7 @@ class App:
         self._ipc_server.stop()
         self.watcher.stop()
         self.history.close()
+        self.achievements.close()
 
     def _cleanup_reminder_loop(self) -> None:
         """Background daemon: notify when a monitored folder has too many files."""
@@ -244,6 +257,26 @@ class App:
                         notified_folders.add(folder)
                 else:
                     notified_folders.discard(folder)
+
+    def _folder_health_loop(self) -> None:
+        """Background daemon: notify when a monitored folder becomes unavailable."""
+        while not self._stop_event.wait(30):
+            for folder in list(self.config.monitored_folders):
+                if not os.path.isdir(folder):
+                    if folder not in self._health_notified:
+                        fallback = self.config.get_setting(
+                            "notification_fallback", "toast-fallback"
+                        )
+                        notify(
+                            "Folder unavailable",
+                            f'"{os.path.basename(folder)}" is no longer accessible. '
+                            "Check Settings to reconfigure.",
+                            fallback_strategy=fallback,
+                        )
+                        self._health_notified.add(folder)
+                        logger.warning("Folder unavailable: %s", folder)
+                else:
+                    self._health_notified.discard(folder)
 
     # ------------------------------------------------------------------
     # File event handling
@@ -351,6 +384,7 @@ class App:
             theme=theme_name,
             on_whitelist=self.config.add_to_whitelist,
             on_quick_add=_on_quick_add,
+            history=self.history,
         )
         t = threading.Thread(target=prompt.show, daemon=True)
         t.start()
@@ -419,6 +453,20 @@ class App:
             self.history.record(src, dst)
             logger.info("Moved %s -> %s", src, dst)
 
+            # Evaluate achievements
+            try:
+                newly = self.achievements.evaluate(self.history._conn)
+                for ach in newly:
+                    notify(
+                        f"Achievement unlocked: {ach.emoji} {ach.name}",
+                        ach.description,
+                        fallback_strategy=self.config.get_setting(
+                            "notification_fallback", "toast-fallback"
+                        ),
+                    )
+            except Exception:
+                logger.debug("Achievement evaluation failed", exc_info=True)
+
             # Native notification (passes configured fallback strategy)
             if self.config.get_setting("native_notifications", True):
                 src_name = os.path.basename(src)
@@ -456,6 +504,30 @@ class App:
     # ------------------------------------------------------------------
     # Tray menu actions
     # ------------------------------------------------------------------
+
+    def _sort_file_via_tray(self) -> None:
+        """Handle 'Sort a file...' from the tray menu."""
+        threading.Thread(target=self._sort_file_flow, daemon=True).start()
+
+    def _sort_file_flow(self) -> None:
+        """Background thread: pick file → trigger sort prompt."""
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        filepath = filedialog.askopenfilename(
+            title="Choose a file to sort",
+            parent=root,
+        )
+        root.destroy()
+        if filepath and os.path.exists(filepath):
+            threading.Thread(
+                target=self._on_file_detected,
+                args=(filepath,),
+                daemon=True,
+            ).start()
 
     def _add_folder_via_tray(self) -> None:
         """Handle 'Add folder to watch...' from the tray menu.

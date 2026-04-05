@@ -93,6 +93,7 @@ class TrayIcon:
         on_open_settings: Callable[[], None] | None = None,
         on_open_rules: Callable[[], None] | None = None,
         on_add_folder: Callable[[], None] | None = None,
+        on_sort_file: Callable[[], None] | None = None,
         on_quit: Callable[[], None] | None = None,
     ) -> None:
         self._on_dashboard = on_open_dashboard or (lambda: None)
@@ -101,6 +102,7 @@ class TrayIcon:
         self._on_settings = on_open_settings or (lambda: None)
         self._on_rules = on_open_rules or (lambda: None)
         self._on_add_folder = on_add_folder or (lambda: None)
+        self._on_sort_file = on_sort_file or (lambda: None)
         self._on_quit = on_quit or (lambda: None)
         self._icon: pystray.Icon | None = None
         self._pending = False
@@ -109,6 +111,7 @@ class TrayIcon:
 
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
+            pystray.MenuItem("Sort a file…", lambda: self._on_sort_file()),
             pystray.MenuItem("Dashboard", lambda: self._on_dashboard()),
             pystray.MenuItem("Add folder to watch...", lambda: self._on_add_folder()),
             pystray.Menu.SEPARATOR,

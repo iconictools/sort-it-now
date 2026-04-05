@@ -6,7 +6,7 @@ import logging
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog
-from typing import Callable
+from typing import Any, Callable
 
 from file_wayfinder.themes import get_theme
 
@@ -24,6 +24,7 @@ class SortPrompt:
         theme: str = "dark",
         on_whitelist: Callable[[str], None] | None = None,
         on_quick_add: Callable[[str], None] | None = None,
+        history: Any = None,
     ) -> None:
         """
         Parameters
@@ -41,6 +42,8 @@ class SortPrompt:
         on_quick_add:
             Called with the folder path when the user clicks "Quick Add Folder"
             (only shown when the detected item is a directory).
+        history:
+            Optional History instance used for "Same as last time" suggestion.
         """
         self._filepath = filepath
         self._destinations = destinations
@@ -49,6 +52,7 @@ class SortPrompt:
         self._theme_name = theme
         self._on_whitelist = on_whitelist
         self._on_quick_add = on_quick_add
+        self._history = history
 
     def show(self) -> None:
         """Display the prompt (blocks until user responds)."""
@@ -230,6 +234,33 @@ class SortPrompt:
         def _choose(dest: str) -> None:
             chosen[0] = dest
             root.destroy()
+
+        # -- "Same as last time" button --
+        last_dest: str | None = None
+        if self._history is not None:
+            _, ext = os.path.splitext(self._filepath)
+            ext = ext.lower()
+            if ext:
+                rows = self._history._conn.execute(
+                    "SELECT dst_path FROM actions WHERE undone=0 "
+                    "AND LOWER(src_path) LIKE ? ORDER BY id DESC LIMIT 1",
+                    (f"%{ext}",),
+                ).fetchone()
+                if rows:
+                    last_dest = os.path.dirname(rows[0])
+
+        if last_dest is not None and os.path.isdir(last_dest) and last_dest in self._destinations:
+            dest_name = os.path.basename(last_dest)
+            tk.Button(
+                btn_frame,
+                text=f"↑ Same as last ({dest_name})",
+                bg=t["success"],
+                fg=t["bg"],
+                activebackground=t["btn_active"],
+                relief="flat",
+                font=("Segoe UI", 10, "bold"),
+                command=lambda d=last_dest: _choose(d),
+            ).pack(fill="x", pady=(0, 4))
 
         for dest in self._destinations:
             label = os.path.basename(dest) if os.path.sep in dest else dest

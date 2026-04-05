@@ -132,6 +132,91 @@ def show_dashboard(
             font=("Segoe UI", 9),
         ).pack(anchor="w")
 
+    # -- Activity Heatmap (last 84 days = 12 weeks) --
+    heatmap_frame = tk.Frame(root, bg=theme["bg"])
+    heatmap_frame.pack(fill="x", padx=24, pady=(8, 4))
+    tk.Label(
+        heatmap_frame, text="Activity (last 12 weeks):",
+        bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
+    ).pack(anchor="w")
+
+    day_counts: dict[int, int] = {}
+    try:
+        hm_rows = history._conn.execute(
+            "SELECT timestamp FROM actions WHERE undone=0"
+        ).fetchall()
+        for hm_row in hm_rows:
+            day = int(hm_row[0] // 86400)
+            day_counts[day] = day_counts.get(day, 0) + 1
+    except Exception:
+        pass
+
+    cell_size = 14
+    gap = 2
+    weeks = 12
+    days_per_week = 7
+    hm_w = cell_size * weeks + gap * (weeks - 1)
+    hm_h = cell_size * days_per_week + gap * (days_per_week - 1)
+    hm_canvas = tk.Canvas(
+        heatmap_frame, width=hm_w, height=hm_h,
+        bg=theme["bg"], highlightthickness=0,
+    )
+    hm_canvas.pack(anchor="w", pady=(4, 0))
+
+    today_day = int(time.time() // 86400)
+    total_cells = weeks * days_per_week
+    for cell_idx in range(total_cells):
+        # cell 0 = oldest, last cell = today (bottom-right)
+        day_offset = total_cells - 1 - cell_idx
+        day_key = today_day - day_offset
+        count = day_counts.get(day_key, 0)
+        col = cell_idx // days_per_week
+        row = cell_idx % days_per_week
+        x0 = col * (cell_size + gap)
+        y0 = row * (cell_size + gap)
+        x1 = x0 + cell_size
+        y1 = y0 + cell_size
+        if count == 0:
+            color = theme["bg"]
+        elif count <= 2:
+            color = "#2d6a2d"
+        elif count <= 5:
+            color = "#3fa53f"
+        else:
+            color = theme["success"]
+        hm_canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline=theme["list_bg"])
+
+    # -- Achievements --
+    from file_wayfinder.achievements import Achievements
+
+    ach_label_frame = tk.Frame(root, bg=theme["bg"])
+    ach_label_frame.pack(fill="x", padx=24, pady=(8, 2))
+    tk.Label(
+        ach_label_frame, text="Achievements:",
+        bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
+    ).pack(anchor="w")
+
+    try:
+        ach_db = os.path.join(os.path.dirname(config.path), "achievements.db")
+        achs = Achievements(ach_db)
+        all_achs = achs.all_status()
+        achs.close()
+        ach_grid = tk.Frame(root, bg=theme["bg"])
+        ach_grid.pack(fill="x", padx=24, pady=(0, 4))
+        for idx, ach in enumerate(all_achs):
+            col = idx % 3
+            row = idx // 3
+            fg_color = theme["success"] if ach.unlocked else theme["muted"]
+            tk.Label(
+                ach_grid,
+                text=f"{ach.emoji} {ach.name}",
+                bg=theme["bg"], fg=fg_color,
+                font=("Segoe UI", 9),
+                anchor="w",
+            ).grid(row=row, column=col, sticky="w", padx=(0, 8), pady=1)
+    except Exception:
+        logger.debug("Achievements panel unavailable", exc_info=True)
+
     # -- Rules summary --
     from file_wayfinder.rules import Rules
 

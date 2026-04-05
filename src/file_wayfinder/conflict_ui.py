@@ -6,6 +6,7 @@ options to overwrite, rename, or skip.
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 import tkinter as tk
@@ -39,7 +40,7 @@ def resolve_conflict(
     root.attributes("-topmost", True)
     root.resizable(False, False)
 
-    w, h = 440, 260
+    w, h = 440, 300
     sx = root.winfo_screenwidth() // 2 - w // 2
     sy = root.winfo_screenheight() // 2 - h // 2
     root.geometry(f"{w}x{h}+{sx}+{sy}")
@@ -76,6 +77,18 @@ def resolve_conflict(
             text=f"New: {_fmt(src_size)}    Existing: {_fmt(dst_size)}",
             bg=t["bg"], fg=t["muted"], font=("Segoe UI", 9),
         ).pack(pady=(0, 12))
+    except OSError:
+        pass
+
+    try:
+        src_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(src))
+        dst_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(dst))
+        fmt = "%Y-%m-%d %H:%M"
+        tk.Label(
+            root,
+            text=f"Modified — New: {src_mtime.strftime(fmt)}    Existing: {dst_mtime.strftime(fmt)}",
+            bg=t["bg"], fg=t["muted"], font=("Segoe UI", 9),
+        ).pack(pady=(0, 8))
     except OSError:
         pass
 
