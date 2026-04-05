@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import copy
 import shutil
 import time
 import zipfile
@@ -195,7 +196,6 @@ class Config:
         # Fill in any missing keys from defaults (forward-compat)
         for k, v in _FOLDER_DEFAULTS.items():
             if k not in entry:
-                import copy
                 entry[k] = copy.deepcopy(v)
         return entry
 

@@ -214,7 +214,7 @@ class App:
         # Destination folders are whitelisted by the program so that files
         # already sorted into them are never re-prompted.
         parent = os.path.dirname(os.path.abspath(filepath))
-        for folder, folder_cfg in self.config.monitored_folders.items():
+        for folder_cfg in self.config.monitored_folders.values():
             for dest in folder_cfg.get("destinations", []):
                 if os.path.abspath(dest) == parent:
                     logger.debug(
