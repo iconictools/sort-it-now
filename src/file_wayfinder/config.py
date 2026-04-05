@@ -21,12 +21,37 @@ logger = logging.getLogger(__name__)
 _DEFAULT_CONFIG: dict[str, Any] = {
     "monitored_folders": {},
     "global_settings": {
+        # UI / behaviour
         "focus_mode": False,
         "snooze_minutes": 0,
         "batch_mode": False,
-        "auto_learn": True,
-        "auto_learn_threshold": 3,
+        "batch_mode_style": "one-by-one",
         "prompt_delay_seconds": 3.0,
+        "theme": "dark",
+        # Monitoring
+        "scan_existing_enabled": False,
+        "catch_folders": False,
+        "pause_on_dnd": False,
+        # Notifications
+        "native_notifications": True,
+        # "plyer-only" | "toast-fallback" | "log-only"
+        "notification_fallback": "toast-fallback",
+        # Pattern rules
+        "pattern_rules_enabled": True,
+        # Duplicate detection
+        "duplicate_detection": False,
+        # Undo behaviour: "ask" | "always" | "never"
+        # When undoing a move that also involved a rename, should the
+        # original filename be restored?
+        "undo_restore_name": "ask",
+        # Multi-instance: "prompt" | "always-merge" | "ignore"
+        # When a second instance launches while one is already running,
+        # how should they behave?
+        "multi_instance_behavior": "prompt",
+        # Quick-Add Folder
+        "quick_add_inherit_destinations": True,
+        "quick_add_auto_whitelist": True,
+        "quick_add_auto_start_watch": True,
     },
     "ignore_patterns": [
         "~$*",

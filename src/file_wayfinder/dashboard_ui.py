@@ -264,8 +264,7 @@ def show_batch_list(
             dest = var.get()
             if dest and os.path.exists(filepath):
                 move_file_fn(filepath, dest)
-                threshold = config.get_setting("auto_learn_threshold", 3)
-                rules.record_action(filepath, dest, threshold=threshold)
+                rules.record_action(filepath, dest)
         root.destroy()
 
     btn_frame = tk.Frame(root, bg=theme["bg"])

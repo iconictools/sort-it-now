@@ -40,7 +40,7 @@ Fill in each **→ Answer:** to guide the next development iteration.
 **Q1.2** What platforms must be supported at launch?
 (a) Windows only  (b) macOS only  (c) Linux only  (d) All three  (e) Other
 
-→ Answer: **(a)** Windows only
+→ Answer: **(e)** Windows and Linux
 
 **Q1.3** Should the app be distributable via a package manager?
 (a) PyPI (`pip install file-wayfinder`)  (b) Homebrew / Chocolatey / Snap  (c) Standalone binary only  (d) Not important yet
@@ -311,11 +311,7 @@ settings, rules, dashboard, conflict) runs in its own background thread.
 with `root.after()` for cross-thread communication? This is a significant
 rewrite of the UI layer but would eliminate all possible tkinter crashes.
 
-→ **Answer:**
-
----
-
-### D2. Migration from .sort-it-now to .file-wayfinder
+→ **Answer:** Keep the current background-thread approach (works reliably on Windows and Linux, the supported platforms). A full `root.after()` refactor is deferred.
 
 **Context:** The config directory changed from `~/.sort-it-now/` to
 `~/.file-wayfinder/`. Existing users would lose their config, rules,

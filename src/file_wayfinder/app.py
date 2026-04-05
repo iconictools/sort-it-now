@@ -17,6 +17,7 @@ from file_wayfinder.constants import DEFAULT_UNSORTED_DIR
 from file_wayfinder.dashboard_ui import show_batch_list, show_dashboard
 from file_wayfinder.duplicate import find_duplicate
 from file_wayfinder.history import History
+from file_wayfinder.ipc import IPCServer
 from file_wayfinder.notifications import notify
 from file_wayfinder.prompt import SortPrompt, SetupWizard
 from file_wayfinder.rules import Rules
@@ -107,6 +108,7 @@ class App:
             on_add_folder=self._add_folder_via_tray,
             on_quit=self._quit,
         )
+        self._ipc_server = IPCServer(on_command=self._handle_ipc_command)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -156,11 +158,13 @@ class App:
                     )
 
         logger.info("File Wayfinder is running.")
+        self._ipc_server.start()
         self._update_tray_monitored_count()
         # Tray icon runs on the main thread (required by OS)
         try:
             self.tray.start()
         finally:
+            self._ipc_server.stop()
             self.watcher.stop()
             self.history.close()
 
@@ -169,8 +173,32 @@ class App:
         count = len(self.config.monitored_folders)
         self.tray.set_monitored_count(count)
 
+    def _handle_ipc_command(self, command: str) -> None:
+        """Handle a command sent by another File Wayfinder instance via IPC.
+
+        Currently supported commands:
+        ``ADD_FOLDER:<abs_path>`` — start watching the given folder, inheriting
+        destinations from the closest already-watched parent (if any).
+        """
+        if command.startswith("ADD_FOLDER:"):
+            folder = command[len("ADD_FOLDER:"):]
+            if not folder or folder in self.config.monitored_folders:
+                return
+            # Find a parent folder to inherit destinations from
+            parent_monitored = next(
+                (mf for mf in self.config.monitored_folders if folder.startswith(mf)),
+                next(iter(self.config.monitored_folders), ""),
+            )
+            logger.info("IPC: adding folder %s (parent: %s)", folder, parent_monitored)
+            threading.Thread(
+                target=self._quick_add_folder,
+                args=(folder, parent_monitored),
+                daemon=True,
+            ).start()
+
     def _quit(self) -> None:
         logger.info("Shutting down...")
+        self._ipc_server.stop()
         self.watcher.stop()
         self.history.close()
 
@@ -328,11 +356,17 @@ class App:
             self.history.record(src, dst)
             logger.info("Moved %s -> %s", src, dst)
 
-            # Native notification
+            # Native notification (passes configured fallback strategy)
             if self.config.get_setting("native_notifications", True):
                 src_name = os.path.basename(src)
                 dest_name = os.path.basename(dest_dir)
-                notify("File sorted", f"{src_name} -> {dest_name}")
+                fallback = self.config.get_setting(
+                    "notification_fallback", "toast-fallback"
+                )
+                notify(
+                    "File sorted", f"{src_name} -> {dest_name}",
+                    fallback_strategy=fallback,
+                )
         except (OSError, shutil.Error) as exc:
             logger.error("Failed to move %s -> %s: %s", src, dest_dir, exc)
             try:
@@ -573,12 +607,52 @@ class App:
 
     def _undo_last(self) -> None:
         result = self.history.undo_last()
-        if result:
-            # Mark the restored path so the watcher ignores it
-            self.watcher.mark_self_moved(result[1])
-            logger.info("Undone: %s -> %s", *result)
-        else:
+        if not result:
             logger.info("Nothing to undo.")
+            return
+
+        dst_path, src_path = result
+        # Mark restored path so the watcher ignores it
+        self.watcher.mark_self_moved(src_path)
+        logger.info("Undone: %s -> %s", dst_path, src_path)
+
+        # Check whether a rename happened during the move.
+        dst_basename = os.path.basename(dst_path)
+        src_basename = os.path.basename(src_path)
+        if dst_basename == src_basename:
+            return  # No rename — nothing more to do.
+
+        strategy = self.config.get_setting("undo_restore_name", "ask")
+
+        def _should_restore() -> bool:
+            if strategy == "always":
+                return True
+            if strategy == "never":
+                return False
+            # "ask" — prompt the user
+            import tkinter as tk
+            from tkinter import messagebox
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            answer = messagebox.askyesno(
+                "Undo rename?",
+                f"The file was renamed during the move:\n\n"
+                f"  Original name: {dst_basename}\n"
+                f"  Current name:  {src_basename}\n\n"
+                "Do you also want to restore the original filename?",
+                parent=root,
+            )
+            root.destroy()
+            return answer
+
+        if _should_restore() and os.path.exists(src_path):
+            restored = os.path.join(os.path.dirname(src_path), dst_basename)
+            try:
+                os.rename(src_path, restored)
+                logger.info("Name restored: %s -> %s", src_basename, dst_basename)
+            except OSError as exc:
+                logger.warning("Could not restore filename: %s", exc)
 
     def _show_settings(self) -> None:
         """Open the settings dialog."""

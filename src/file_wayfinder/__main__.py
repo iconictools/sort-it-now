@@ -95,6 +95,52 @@ def main(argv: list[str] | None = None) -> None:
         if not folders:
             return
 
+    # ── Multi-instance handling ──────────────────────────────────────
+    from file_wayfinder.ipc import is_running, send_command
+
+    if is_running():
+        behavior = config.get_setting("multi_instance_behavior", "prompt")
+
+        if behavior == "ignore":
+            # Start a completely independent second instance (no merge).
+            pass
+
+        else:
+            # "always-merge" or "prompt" — try to merge into the running instance.
+            merge = True
+            if behavior == "prompt":
+                import tkinter as tk
+                from tkinter import messagebox
+
+                _root = tk.Tk()
+                _root.withdraw()
+                merge = messagebox.askyesno(
+                    "File Wayfinder is already running",
+                    "Another instance is already running.\n\n"
+                    "Do you want to add a new folder to the running instance?\n\n"
+                    "(Choose No to open a separate, independent instance.)",
+                )
+                _root.destroy()
+
+            if merge:
+                # Ask the user which folder to add, then send it via IPC.
+                import tkinter as tk
+                from tkinter import filedialog
+
+                _root = tk.Tk()
+                _root.withdraw()
+                folder = filedialog.askdirectory(
+                    title="Choose a folder for the running File Wayfinder to watch"
+                )
+                _root.destroy()
+                if folder:
+                    send_command(f"ADD_FOLDER:{folder}")
+                    logging.getLogger(__name__).info(
+                        "Sent ADD_FOLDER command to running instance: %s", folder
+                    )
+                return  # second instance exits after delegating
+
+    # ── Normal startup ────────────────────────────────────────────────
     app = App(config=config)
     app.run()
 
