@@ -409,7 +409,7 @@ class App:
     # File operations
     # ------------------------------------------------------------------
 
-    def _move_file(self, src: str, dest_dir: str) -> None:
+    def _move_file(self, src: str, dest_dir: str, source_folder: str | None = None) -> None:
         """Move *src* (file or folder) into *dest_dir*, recording the action.
 
         On failure, falls back to an "unsorted" folder so items are never lost.
@@ -417,6 +417,15 @@ class App:
         """
         try:
             os.makedirs(dest_dir, exist_ok=True)
+
+            # Derive source_folder from monitored folders if not provided
+            if source_folder is None:
+                src_parent = os.path.dirname(os.path.abspath(src))
+                for mf in self.config.monitored_folders:
+                    mf_abs = os.path.abspath(mf)
+                    if src_parent == mf_abs or src_parent.startswith(mf_abs + os.sep):
+                        source_folder = mf
+                        break
 
             # Apply rename pattern if configured (files only, not folders)
             if not os.path.isdir(src):
@@ -450,12 +459,12 @@ class App:
 
             self.watcher.mark_self_moved(dst)
             shutil.move(src, dst)
-            self.history.record(src, dst)
+            self.history.record(src, dst, source_folder=source_folder)
             logger.info("Moved %s -> %s", src, dst)
 
             # Evaluate achievements
             try:
-                newly = self.achievements.evaluate(self.history._conn)
+                newly = self.achievements.evaluate(self.history)
                 for ach in newly:
                     notify(
                         f"Achievement unlocked: {ach.emoji} {ach.name}",
@@ -494,7 +503,7 @@ class App:
                         counter += 1
                 self.watcher.mark_self_moved(fb_dst)
                 shutil.move(src, fb_dst)
-                self.history.record(src, fb_dst)
+                self.history.record(src, fb_dst, source_folder=source_folder)
                 logger.warning("Fallback: moved %s -> %s", src, fb_dst)
             except (OSError, shutil.Error) as fb_exc:
                 logger.error(

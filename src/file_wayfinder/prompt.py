@@ -239,15 +239,8 @@ class SortPrompt:
         last_dest: str | None = None
         if self._history is not None:
             _, ext = os.path.splitext(self._filepath)
-            ext = ext.lower()
             if ext:
-                rows = self._history._conn.execute(
-                    "SELECT dst_path FROM actions WHERE undone=0 "
-                    "AND LOWER(src_path) LIKE ? ORDER BY id DESC LIMIT 1",
-                    (f"%{ext}",),
-                ).fetchone()
-                if rows:
-                    last_dest = os.path.dirname(rows[0])
+                last_dest = self._history.last_dest_for_ext(ext)
 
         if last_dest is not None and os.path.isdir(last_dest) and last_dest in self._destinations:
             dest_name = os.path.basename(last_dest)

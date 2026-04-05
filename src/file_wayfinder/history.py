@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import sqlite3
 import time
 
 from file_wayfinder.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS actions (
@@ -32,8 +35,12 @@ class History:
         try:
             self._conn.execute("ALTER TABLE actions ADD COLUMN source_folder TEXT")
             self._conn.commit()
-        except sqlite3.OperationalError:
-            pass  # column already exists
+            logger.debug("Migrated history DB: added source_folder column")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column" in str(exc).lower():
+                logger.debug("History DB: source_folder column already exists")
+            else:
+                logger.warning("History DB migration issue: %s", exc)
 
     # ------------------------------------------------------------------
     # Recording
@@ -157,6 +164,45 @@ class History:
         """Delete all history records without moving any files."""
         self._conn.execute("DELETE FROM actions")
         self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Public query helpers (avoid exposing _conn to callers)
+    # ------------------------------------------------------------------
+
+    def last_dest_for_ext(self, ext: str) -> str | None:
+        """Return the most recent destination *directory* for files with *ext*.
+
+        *ext* should include the dot, e.g. ``".pdf"``.  Returns *None* if
+        there is no matching non-undone record.
+        """
+        ext_lower = ext.lower()
+        row = self._conn.execute(
+            "SELECT dst_path FROM actions WHERE undone=0 "
+            "AND LOWER(src_path) LIKE ? ORDER BY id DESC LIMIT 1",
+            (f"%{ext_lower}",),
+        ).fetchone()
+        return os.path.dirname(row[0]) if row else None
+
+    def all_timestamps(self) -> list[float]:
+        """Return timestamps of all non-undone actions, newest first."""
+        rows = self._conn.execute(
+            "SELECT timestamp FROM actions WHERE undone=0 ORDER BY id DESC"
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def all_src_paths(self) -> list[str]:
+        """Return src_path of all non-undone actions."""
+        rows = self._conn.execute(
+            "SELECT src_path FROM actions WHERE undone=0"
+        ).fetchall()
+        return [r[0] for r in rows]
+
+    def all_dst_paths(self) -> list[str]:
+        """Return dst_path of all non-undone actions."""
+        rows = self._conn.execute(
+            "SELECT dst_path FROM actions WHERE undone=0"
+        ).fetchall()
+        return [r[0] for r in rows]
 
     def close(self) -> None:
         self._conn.close()

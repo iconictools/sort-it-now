@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from file_wayfinder.history import History
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,17 +56,15 @@ class Achievements:
             );
         """)
 
-    def evaluate(self, history_conn: sqlite3.Connection) -> list[Achievement]:
-        """Evaluate all achievements against history. Returns newly unlocked ones."""
+    def evaluate(self, history: "History") -> list[Achievement]:
+        """Evaluate all achievements against *history*. Returns newly unlocked ones."""
         newly_unlocked: list[Achievement] = []
         already = {
             row[0] for row in
             self._conn.execute("SELECT id FROM achievements WHERE unlocked_at > 0").fetchall()
         }
 
-        total = history_conn.execute(
-            "SELECT COUNT(*) FROM actions WHERE undone=0"
-        ).fetchone()[0]
+        total = history.total_count()
 
         # Milestone counts
         for ach_id, threshold in [
@@ -69,15 +74,9 @@ class Achievements:
             if ach_id not in already and total >= threshold:
                 newly_unlocked.append(self._unlock(ach_id))
 
-        # Streak
-        days_with_activity: set[int] = set()
-        rows = history_conn.execute(
-            "SELECT timestamp FROM actions WHERE undone=0 ORDER BY timestamp DESC"
-        ).fetchall()
-        for row in rows:
-            day = int(row[0] // 86400)
-            days_with_activity.add(day)
-
+        # Streak: consecutive calendar days with at least one action
+        timestamps = history.all_timestamps()
+        days_with_activity: set[int] = {int(ts // 86400) for ts in timestamps}
         today = int(time.time() // 86400)
         for streak_len, ach_id in [(3, "streak_3"), (7, "streak_7"), (30, "streak_30")]:
             if ach_id not in already:
@@ -89,34 +88,34 @@ class Achievements:
                     newly_unlocked.append(self._unlock(ach_id))
 
         # Night owl / early bird (local hour)
-        for row in rows:
-            hour = time.localtime(row[0]).tm_hour
+        for ts in timestamps:
+            hour = time.localtime(ts).tm_hour
             if "night_owl" not in already and 0 <= hour < 5:
                 newly_unlocked.append(self._unlock("night_owl"))
                 already.add("night_owl")
             if "early_bird" not in already and 5 <= hour < 7:
                 newly_unlocked.append(self._unlock("early_bird"))
                 already.add("early_bird")
+            if "night_owl" in already and "early_bird" in already:
+                break
 
-        # Speed demon: 10 sorts in 60 seconds
-        if "speed_demon" not in already and len(rows) >= 10:
-            timestamps = [r[0] for r in rows[:10]]
-            if max(timestamps) - min(timestamps) <= 60:
-                newly_unlocked.append(self._unlock("speed_demon"))
+        # Speed demon: any sliding window of 10 consecutive sorts within 60 s
+        if "speed_demon" not in already and len(timestamps) >= 10:
+            ts_sorted = sorted(timestamps)
+            for i in range(len(ts_sorted) - 9):
+                if ts_sorted[i + 9] - ts_sorted[i] <= 60:
+                    newly_unlocked.append(self._unlock("speed_demon"))
+                    break
 
-        # Neat freak: 5 distinct destinations
-        dests = history_conn.execute(
-            "SELECT DISTINCT dst_path FROM actions WHERE undone=0"
-        ).fetchall()
-        unique_dirs = {os.path.dirname(d[0]) for d in dests}
+        # Neat freak: 5 distinct destination directories
+        dst_paths = history.all_dst_paths()
+        unique_dirs = {os.path.dirname(d) for d in dst_paths}
         if "neat_freak" not in already and len(unique_dirs) >= 5:
             newly_unlocked.append(self._unlock("neat_freak"))
 
-        # Variety: 5 distinct extensions
-        srcs = history_conn.execute(
-            "SELECT src_path FROM actions WHERE undone=0"
-        ).fetchall()
-        exts = {os.path.splitext(s[0])[1].lower() for s in srcs if os.path.splitext(s[0])[1]}
+        # Variety: 5 distinct file extensions
+        src_paths = history.all_src_paths()
+        exts = {os.path.splitext(s)[1].lower() for s in src_paths if os.path.splitext(s)[1]}
         if "variety" not in already and len(exts) >= 5:
             newly_unlocked.append(self._unlock("variety"))
 
@@ -129,7 +128,10 @@ class Achievements:
             (ach_id, now),
         )
         self._conn.commit()
-        ach = next(a for a in _ALL_ACHIEVEMENTS if a.id == ach_id)
+        ach = next((a for a in _ALL_ACHIEVEMENTS if a.id == ach_id), None)
+        if ach is None:
+            logger.warning("Unknown achievement id: %s", ach_id)
+            return Achievement(ach_id, ach_id, "", "?", unlocked=True, unlocked_at=now)
         return Achievement(ach.id, ach.name, ach.description, ach.emoji,
                            unlocked=True, unlocked_at=now)
 
