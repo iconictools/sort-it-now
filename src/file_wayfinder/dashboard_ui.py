@@ -66,9 +66,7 @@ def show_dashboard(
 
     # -- File type / destination taxonomy stats --
     try:
-        rows = history._conn.execute(
-            "SELECT src_path, dst_path FROM actions WHERE undone=0"
-        ).fetchall()
+        rows = history.all_moves()
         ext_counts: dict[str, int] = {}
         dest_counts: dict[str, int] = {}
         for src_path, dst_path in rows:
@@ -142,11 +140,8 @@ def show_dashboard(
 
     day_counts: dict[int, int] = {}
     try:
-        hm_rows = history._conn.execute(
-            "SELECT timestamp FROM actions WHERE undone=0"
-        ).fetchall()
-        for hm_row in hm_rows:
-            day = int(hm_row[0] // 86400)
+        for timestamp in history.all_timestamps():
+            day = int(timestamp // 86400)
             day_counts[day] = day_counts.get(day, 0) + 1
     except Exception:
         pass

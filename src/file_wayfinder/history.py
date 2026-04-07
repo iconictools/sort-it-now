@@ -58,14 +58,14 @@ class History:
 
     def _prune(self) -> None:
         """Delete oldest rows when the table exceeds HISTORY_MAX_ACTIONS."""
-        count = self._conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]
-        if count > HISTORY_MAX_ACTIONS:
-            self._conn.execute(
-                "DELETE FROM actions WHERE id IN "
-                "(SELECT id FROM actions ORDER BY id ASC LIMIT ?)",
-                (count - HISTORY_MAX_ACTIONS,),
-            )
-            self._conn.commit()
+        self._conn.execute(
+            "DELETE FROM actions "
+            "WHERE id < ("
+            "    SELECT id FROM actions ORDER BY id DESC LIMIT 1 OFFSET ?"
+            ")",
+            (HISTORY_MAX_ACTIONS - 1,),
+        )
+        self._conn.commit()
 
     # ------------------------------------------------------------------
     # Undo
@@ -203,6 +203,13 @@ class History:
             "SELECT dst_path FROM actions WHERE undone=0"
         ).fetchall()
         return [r[0] for r in rows]
+
+    def all_moves(self) -> list[tuple[str, str]]:
+        """Return ``(src_path, dst_path)`` for all non-undone actions."""
+        rows = self._conn.execute(
+            "SELECT src_path, dst_path FROM actions WHERE undone=0"
+        ).fetchall()
+        return [(r[0], r[1]) for r in rows]
 
     def close(self) -> None:
         self._conn.close()

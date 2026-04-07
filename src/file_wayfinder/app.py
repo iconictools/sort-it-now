@@ -358,8 +358,7 @@ class App:
             return
 
         # Merge global and per-folder extension maps (per-folder takes priority)
-        lookup_folder = parent_monitored or parent
-        folder_ext_map = self.config.get_folder_extension_map(lookup_folder)
+        folder_ext_map = self.config.get_folder_extension_map(parent_monitored)
         if folder_ext_map:
             merged_ext_map = {**self.rules.extension_map, **folder_ext_map}
         else:
@@ -379,15 +378,11 @@ class App:
 
         theme_name = self.config.get_setting("theme", "dark")
 
-        # Build quick-add callback (only meaningful for directories)
-        parent_monitored = parent
-        for mf in self.config.monitored_folders:
-            if os.path.abspath(mf) == parent:
-                parent_monitored = mf
-                break
+        # Capture for the closure — parent_monitored is already correctly resolved above.
+        _pm = parent_monitored
 
         def _on_quick_add(folder_path: str) -> None:
-            self._quick_add_folder(folder_path, parent_monitored)
+            self._quick_add_folder(folder_path, _pm)
 
         # Show prompt on the main thread via threading
         prompt = SortPrompt(

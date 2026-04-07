@@ -166,9 +166,8 @@ class _Handler(FileSystemEventHandler):
                 close_event.set()
             self._pending[path] = close_event
 
-        def _process() -> None:
+        def _process(ev: threading.Event = close_event) -> None:
             try:
-                ev = self._pending.get(path)
                 if _wait_until_stable(path, close_event=ev):
                     self._callback(path)
             finally:
