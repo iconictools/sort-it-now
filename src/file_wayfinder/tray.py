@@ -93,7 +93,7 @@ class TrayIcon:
         on_open_settings: Callable[[], None] | None = None,
         on_open_rules: Callable[[], None] | None = None,
         on_add_folder: Callable[[], None] | None = None,
-        on_sort_file: Callable[[], None] | None = None,
+        on_process_pending: Callable[[], None] | None = None,
         on_quit: Callable[[], None] | None = None,
     ) -> None:
         self._on_dashboard = on_open_dashboard or (lambda: None)
@@ -102,28 +102,37 @@ class TrayIcon:
         self._on_settings = on_open_settings or (lambda: None)
         self._on_rules = on_open_rules or (lambda: None)
         self._on_add_folder = on_add_folder or (lambda: None)
-        self._on_sort_file = on_sort_file or (lambda: None)
+        self._on_process_pending = on_process_pending or (lambda: None)
         self._on_quit = on_quit or (lambda: None)
         self._icon: pystray.Icon | None = None
         self._pending = False
         self._pending_count = 0
+        self._focus_mode = False
         self._monitored_count = 0
 
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
-            pystray.MenuItem("Sort a file…", lambda: self._on_sort_file()),
-            pystray.MenuItem("Dashboard", lambda: self._on_dashboard()),
             pystray.MenuItem("Add folder to watch...", lambda: self._on_add_folder()),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Undo last", lambda: self._on_undo()),
+            pystray.MenuItem(
+                lambda _: (
+                    f"Sort {self._pending_count} pending file{'s' if self._pending_count != 1 else ''}"
+                    if self._pending_count > 0
+                    else "Sort pending files"
+                ),
+                lambda: self._on_process_pending(),
+                visible=lambda _: self._pending,
+            ),
             pystray.MenuItem(
                 "Focus mode",
                 lambda: self._on_focus(),
-                checked=lambda _: self._pending,
+                checked=lambda _: self._focus_mode,
             ),
+            pystray.MenuItem("Undo last move", lambda: self._on_undo()),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Manage Rules", lambda: self._on_rules()),
+            pystray.MenuItem("Dashboard", lambda: self._on_dashboard()),
             pystray.MenuItem("Settings", lambda: self._on_settings()),
+            pystray.MenuItem("Manage Rules", lambda: self._on_rules()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", lambda: self._quit()),
         )
@@ -148,6 +157,10 @@ class TrayIcon:
         t = threading.Thread(target=self.start, daemon=True)
         t.start()
         return t
+
+    def set_focus_mode(self, enabled: bool) -> None:
+        """Update the focus-mode checkmark state in the tray menu."""
+        self._focus_mode = enabled
 
     def set_pending(self, pending: bool, count: int = 0) -> None:
         """Update the icon to reflect pending items with a badge count."""

@@ -113,7 +113,7 @@ class App:
             on_open_settings=self._show_settings,
             on_open_rules=self._show_rules,
             on_add_folder=self._add_folder_via_tray,
-            on_sort_file=self._sort_file_via_tray,
+            on_process_pending=self._process_batch_queue,
             on_quit=self._quit,
         )
         self._ipc_server = IPCServer(on_command=self._handle_ipc_command)
@@ -125,7 +125,8 @@ class App:
     def run(self) -> None:
         """Start the application (blocks until quit)."""
         # First-run setup if no monitored folders
-        if not self.config.monitored_folders:
+        first_run = not bool(self.config.monitored_folders)
+        if first_run:
             wizard = SetupWizard()
             folders = wizard.run()
             if not folders:
@@ -156,8 +157,12 @@ class App:
                     logger.error("Cannot watch %s: %s", folder, exc)
         self.watcher.start()
 
-        # Scan existing files in monitored folders
-        if self.config.get_setting("scan_existing_enabled", False):
+        # Sync focus mode state into the tray icon
+        self.tray.set_focus_mode(self._focus_mode)
+
+        # Scan existing files: always on first run so the user can sort what's
+        # already there; on subsequent starts only when the setting is enabled.
+        if first_run or self.config.get_setting("scan_existing_enabled", False):
             whitelist = self.config.get_whitelist()
             for folder in self.config.monitored_folders:
                 if folder not in missing:
@@ -520,29 +525,7 @@ class App:
     # Tray menu actions
     # ------------------------------------------------------------------
 
-    def _sort_file_via_tray(self) -> None:
-        """Handle 'Sort a file...' from the tray menu."""
-        threading.Thread(target=self._sort_file_flow, daemon=True).start()
 
-    def _sort_file_flow(self) -> None:
-        """Background thread: pick file → trigger sort prompt."""
-        import tkinter as tk
-        from tkinter import filedialog
-
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        filepath = filedialog.askopenfilename(
-            title="Choose a file to sort",
-            parent=root,
-        )
-        root.destroy()
-        if filepath and os.path.exists(filepath):
-            threading.Thread(
-                target=self._on_file_detected,
-                args=(filepath,),
-                daemon=True,
-            ).start()
 
     def _add_folder_via_tray(self) -> None:
         """Handle 'Add folder to watch...' from the tray menu.
@@ -623,40 +606,23 @@ class App:
         except OSError:
             existing = []
 
-        whitelist_existing = False
+        sort_existing = True
         if existing:
-            answer = messagebox.askyesnocancel(
+            sort_existing = messagebox.askyesno(
                 "Existing files found",
-                f"{len(existing)} item(s) already in {os.path.basename(folder)}.\n\n"
-                "Yes  — Add them all to the whitelist (ignore forever)\n"
-                "No   — Sort them now using the main sorting screen\n"
-                "Cancel — Abort",
+                f"{len(existing)} item(s) already in '{os.path.basename(folder)}'.\n\n"
+                "Sort them now?\n\n"
+                "Yes — Open sorting screen for each file\n"
+                "No  — Ignore them (whitelist all existing files)",
                 parent=root,
             )
-            if answer is None:
-                root.destroy()
-                return
-            whitelist_existing = bool(answer)
 
         root.destroy()
 
         # Persist configuration
         self.config.add_monitored_folder(folder, dests)
-        if whitelist_existing:
-            for item in existing:
-                self.config.add_to_whitelist(os.path.basename(item))
-            logger.info(
-                "Whitelisted %d existing items in %s", len(existing), folder
-            )
-        else:
-            # Queue existing files for sorting
-            for item in existing:
-                with self._lock:
-                    self._batch_queue.append(item)
-            count = len(self._batch_queue)
-            self.tray.set_pending(True, count)
 
-        # Start watching the new folder
+        # Start watching the new folder immediately
         try:
             self.watcher.add_folder(folder)
         except Exception as exc:
@@ -665,9 +631,20 @@ class App:
         self._update_tray_monitored_count()
         logger.info("Added monitored folder: %s -> %s", folder, dests)
 
-        # If not whitelisted, open sorting screen immediately
-        if not whitelist_existing and existing:
-            self._process_batch_queue()
+        if existing:
+            if sort_existing:
+                # Queue all existing files and open the sorting screen immediately
+                for item in existing:
+                    with self._lock:
+                        self._batch_queue.append(item)
+                self._process_batch_queue()
+            else:
+                # Whitelist all so they are never prompted
+                for item in existing:
+                    self.config.add_to_whitelist(os.path.basename(item))
+                logger.info(
+                    "Whitelisted %d existing items in %s", len(existing), folder
+                )
 
     def _quick_add_folder(self, folder_path: str, parent_monitored: str) -> None:
         """Add a detected directory as a new monitored folder (Quick Add Folder).
@@ -751,6 +728,7 @@ class App:
     def _toggle_focus(self) -> None:
         self._focus_mode = not self._focus_mode
         self.config.set_setting("focus_mode", self._focus_mode)
+        self.tray.set_focus_mode(self._focus_mode)
         if not self._focus_mode:
             self._process_batch_queue()
         logger.info("Focus mode: %s", self._focus_mode)
