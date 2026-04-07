@@ -610,7 +610,7 @@ class App:
         if existing:
             sort_existing = messagebox.askyesno(
                 "Existing files found",
-                f"{len(existing)} item(s) already in '{os.path.basename(folder)}'.\n\n"
+                f"{len(existing)} {'item' if len(existing) == 1 else 'items'} already in '{os.path.basename(folder)}'.\n\n"
                 "Sort them now?\n\n"
                 "Yes — Open sorting screen for each file\n"
                 "No  — Ignore them (whitelist all existing files)",
