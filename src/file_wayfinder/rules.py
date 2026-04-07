@@ -48,6 +48,7 @@ class Rules:
                 except OSError:
                     pass
                 self._data = {"extension_map": {}, "history": []}
+                self.save()  # overwrite the corrupted file once, not on every startup
         else:
             self._data = {"extension_map": {}, "history": []}
 

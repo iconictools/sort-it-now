@@ -202,9 +202,14 @@ class App:
             folder = command[len("ADD_FOLDER:"):]
             if not folder or folder in self.config.monitored_folders:
                 return
-            # Find a parent folder to inherit destinations from
+            # Find a parent folder to inherit destinations from (proper path containment)
+            folder_abs = os.path.abspath(folder)
             parent_monitored = next(
-                (mf for mf in self.config.monitored_folders if folder.startswith(mf)),
+                (
+                    mf for mf in self.config.monitored_folders
+                    if folder_abs == os.path.abspath(mf)
+                    or folder_abs.startswith(os.path.abspath(mf) + os.sep)
+                ),
                 next(iter(self.config.monitored_folders), ""),
             )
             logger.info("IPC: adding folder %s (parent: %s)", folder, parent_monitored)
@@ -327,21 +332,22 @@ class App:
                 self._move_file(filepath, pattern_dest)
                 return
 
-        # Determine which monitored folder this file belongs to
+        # Determine which monitored folder this file belongs to.
+        # Always resolve via monitored_folders first — never call get_folder_destinations()
+        # on an arbitrary path because Config._folder_data() auto-creates entries.
         parent = os.path.dirname(os.path.abspath(filepath))
-        destinations = self.config.get_folder_destinations(parent)
         parent_monitored: str | None = None
-        if not destinations:
-            # Try to find a matching monitored folder (with proper path check)
-            for mf in self.config.monitored_folders:
-                mf_abs = os.path.abspath(mf)
-                if parent == mf_abs or parent.startswith(mf_abs + os.sep):
-                    destinations = self.config.get_folder_destinations(mf)
-                    parent_monitored = mf
-                    break
-        else:
-            parent_monitored = parent
+        for mf in self.config.monitored_folders:
+            mf_abs = os.path.abspath(mf)
+            if parent == mf_abs or parent.startswith(mf_abs + os.sep):
+                parent_monitored = mf
+                break
 
+        if not parent_monitored:
+            logger.debug("No monitored folder for %s", filepath)
+            return
+
+        destinations = self.config.get_folder_destinations(parent_monitored)
         if not destinations:
             logger.debug("No destinations configured for %s", filepath)
             return
@@ -842,10 +848,12 @@ class App:
         style = self.config.get_setting("batch_mode_style", "one-by-one")
         if style == "batch-list" and queue:
             theme_name = self.config.get_setting("theme", "dark")
-            show_batch_list(
-                self.config, self.rules, self.watcher, queue,
-                theme_name, self._move_file,
-            )
+            threading.Thread(
+                target=show_batch_list,
+                args=(self.config, self.rules, self.watcher, queue,
+                      theme_name, self._move_file),
+                daemon=True,
+            ).start()
         else:
             for filepath in queue:
                 if os.path.exists(filepath):

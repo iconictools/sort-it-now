@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
 import threading
 
 logger = logging.getLogger(__name__)
@@ -47,6 +49,19 @@ def _show_toast_fallback(title: str, message: str, timeout_ms: int = 4000) -> No
         logger.debug("Toast fallback failed: %s", exc)
 
 
+def _notify_send(title: str, message: str, timeout_ms: int = 5000) -> bool:
+    """Use the Linux ``notify-send`` utility.  Returns *True* on success."""
+    try:
+        subprocess.run(
+            ["notify-send", "-t", str(timeout_ms), title, message],
+            timeout=3,
+            check=True,
+        )
+        return True
+    except Exception:
+        return False
+
+
 # ── Public API ────────────────────────────────────────────────────────
 
 
@@ -88,10 +103,16 @@ def notify(
             logger.debug("Native notification failed (%s): %s", type(exc).__name__, exc)
 
         # plyer failed — apply fallback strategy
-        if fallback_strategy == "toast-fallback":
-            _show_toast_fallback(title, message, timeout_ms=timeout * 1000)
-        elif fallback_strategy == "log-only":
+        if fallback_strategy == "log-only":
             logger.info("Notification: %s -- %s", title, message)
-        # "plyer-only" → do nothing
+            return
+        if fallback_strategy == "plyer-only":
+            return  # do nothing
+
+        # "toast-fallback": on Linux try notify-send first, then tkinter overlay
+        timeout_ms = timeout * 1000
+        if sys.platform.startswith("linux") and _notify_send(title, message, timeout_ms):
+            return
+        _show_toast_fallback(title, message, timeout_ms=timeout_ms)
 
     threading.Thread(target=_send, daemon=True).start()

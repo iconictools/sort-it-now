@@ -143,13 +143,16 @@ class TestAutostart:
     def test_is_autostart_returns_false_on_non_windows(self):
         from file_wayfinder.autostart import is_autostart_enabled
 
-        if sys.platform != "win32":
+        # autostart is supported on Windows (registry) and Linux (XDG .desktop)
+        # On other platforms it always returns False
+        if sys.platform not in ("win32",) and not sys.platform.startswith("linux"):
             assert is_autostart_enabled() is False
 
     def test_set_autostart_returns_false_on_non_windows(self):
         from file_wayfinder.autostart import set_autostart
 
-        if sys.platform != "win32":
+        # autostart is now supported on Windows and Linux; only unsupported on other platforms
+        if sys.platform not in ("win32",) and not sys.platform.startswith("linux"):
             assert set_autostart(True) is False
             assert set_autostart(False) is False
 

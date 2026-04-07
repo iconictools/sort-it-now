@@ -271,7 +271,12 @@ class FolderWatcher:
         """
         folder = os.path.abspath(folder)
         wl = whitelist or []
-        for entry in os.scandir(folder):
+        try:
+            entries = list(os.scandir(folder))
+        except OSError as exc:
+            logger.info("Skipping scan of %s: %s", folder, exc)
+            return
+        for entry in entries:
             if entry.is_dir():
                 if not self._catch_folders:
                     continue
