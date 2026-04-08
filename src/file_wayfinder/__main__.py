@@ -112,6 +112,13 @@ def main(argv: list[str] | None = None) -> None:
         if not folders:
             return
 
+    # ── Apply customtkinter appearance early ─────────────────────────
+    try:
+        from file_wayfinder.themes import apply_ctk_appearance
+        apply_ctk_appearance(config.get_setting("theme", "dark"))
+    except Exception:
+        pass
+
     # ── Multi-instance handling ──────────────────────────────────────
     from file_wayfinder.ipc import is_running, send_command
 

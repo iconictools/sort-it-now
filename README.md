@@ -36,18 +36,37 @@ Every other file-watching tool eventually starts sorting files automatically (au
 | **Batch processing** | Process queued files one-by-one or via batch list |
 | **Settings UI** | Full tabbed settings dialog — no JSON editing required |
 | **Rule management UI** | View, add, edit, and delete explicit rules visually |
-| **Dark / Light theme** | Catppuccin-inspired themes |
+| **Dark / Light theme** | Catppuccin-inspired themes via customtkinter — beautiful rounded widgets |
+| **Polished UI** | Modern, rounded dialogs (customtkinter) on all platforms — Windows, macOS, Linux |
 | **Whitelist** | Control exactly which files to ignore |
 | **Catch folders** | Optionally detect and sort entire directories |
 | **Quick Add** | Instantly start monitoring a new sub-folder from the sort prompt |
 | **Config import/export** | Backup and restore your setup as a zip |
-| **Autostart** | Start on login (Windows) |
+| **Autostart** | Start on login (Windows registry, Linux XDG autostart, macOS LaunchAgent) |
+| **AppImage** | Full-featured AppImage for Linux — no installation required |
+| **Cross-platform** | Works on Windows, macOS, and Linux |
 | **Self-loop prevention** | Files the app moves won't re-trigger the watcher |
 | **Cross-platform** | Works on Windows, macOS, and Linux |
 | **Self-building CI** | GitHub Actions builds executables on every push |
 | **Manual build** | `python build.py` creates a standalone executable locally |
 
 ## Quick start
+
+### Download a pre-built binary
+
+Head to the [Releases](https://github.com/trabalhefabricio/sort-it-now/releases) page and grab the build for your platform:
+
+| Platform | Download |
+|---|---|
+| **Linux** | `FileWayfinder-<version>-x86_64.AppImage` — make executable, double-click to run |
+| **Windows** | `file-wayfinder.exe` — run directly, no installer needed |
+| **macOS** | `file-wayfinder` — run from Terminal or double-click |
+
+#### Linux AppImage quick start
+```bash
+chmod +x FileWayfinder-*.AppImage
+./FileWayfinder-*.AppImage
+```
 
 ### Run from source
 

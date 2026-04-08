@@ -9,10 +9,11 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-import tkinter as tk
 from typing import TYPE_CHECKING
 
-from file_wayfinder.themes import get_theme
+import customtkinter as ctk
+
+from file_wayfinder.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
     from file_wayfinder.config import Config
@@ -30,34 +31,36 @@ def resolve_conflict(
     Returns *None* if the user chooses to skip.  Otherwise returns the
     final destination path (possibly renamed).
     """
-    t = get_theme(config.get_setting("theme", "dark"))
+    theme_name = config.get_setting("theme", "dark")
+    t = get_theme(theme_name)
+    apply_ctk_appearance(theme_name)
 
     result: list[str | None] = [None]
 
-    root = tk.Tk()
-    root.title("File Wayfinder -- File Conflict")
-    root.configure(bg=t["bg"])
+    root = ctk.CTk()
+    root.title("File Wayfinder — File Conflict")
     root.attributes("-topmost", True)
     root.resizable(False, False)
 
-    w, h = 440, 300
+    w, h = 460, 320
     sx = root.winfo_screenwidth() // 2 - w // 2
     sy = root.winfo_screenheight() // 2 - h // 2
     root.geometry(f"{w}x{h}+{sx}+{sy}")
 
     basename = os.path.basename(dst)
 
-    tk.Label(
+    ctk.CTkLabel(
         root,
-        text="File already exists",
-        bg=t["bg"], fg=t["danger"],
-        font=("Segoe UI", 14, "bold"),
-    ).pack(pady=(16, 4))
-    tk.Label(
+        text="⚠ File already exists",
+        font=ctk.CTkFont(size=16, weight="bold"),
+        text_color=t["danger"],
+    ).pack(pady=(20, 4))
+
+    ctk.CTkLabel(
         root,
         text=f'"{basename}" already exists at the destination.',
-        bg=t["bg"], fg=t["fg"],
-        font=("Segoe UI", 10), wraplength=400,
+        font=ctk.CTkFont(size=11),
+        wraplength=420,
     ).pack(pady=(0, 4))
 
     # File sizes
@@ -72,11 +75,12 @@ def resolve_conflict(
                 return f"{s / 1024:.1f} KB"
             return f"{s / (1024 * 1024):.1f} MB"
 
-        tk.Label(
+        ctk.CTkLabel(
             root,
             text=f"New: {_fmt(src_size)}    Existing: {_fmt(dst_size)}",
-            bg=t["bg"], fg=t["muted"], font=("Segoe UI", 9),
-        ).pack(pady=(0, 12))
+            font=ctk.CTkFont(size=10),
+            text_color=t["muted"],
+        ).pack(pady=(0, 4))
     except OSError:
         pass
 
@@ -84,16 +88,17 @@ def resolve_conflict(
         src_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(src))
         dst_mtime = datetime.datetime.fromtimestamp(os.path.getmtime(dst))
         fmt = "%Y-%m-%d %H:%M"
-        tk.Label(
+        ctk.CTkLabel(
             root,
             text=f"Modified — New: {src_mtime.strftime(fmt)}    Existing: {dst_mtime.strftime(fmt)}",
-            bg=t["bg"], fg=t["muted"], font=("Segoe UI", 9),
-        ).pack(pady=(0, 8))
+            font=ctk.CTkFont(size=10),
+            text_color=t["muted"],
+        ).pack(pady=(0, 12))
     except OSError:
         pass
 
-    btn_frame = tk.Frame(root, bg=t["bg"])
-    btn_frame.pack(pady=8)
+    btn_frame = ctk.CTkFrame(root, fg_color="transparent")
+    btn_frame.pack(pady=12)
 
     def _overwrite() -> None:
         result[0] = dst
@@ -114,21 +119,41 @@ def resolve_conflict(
         result[0] = None
         root.destroy()
 
-    tk.Button(
-        btn_frame, text="Overwrite", bg=t["danger"], fg="#ffffff",
-        font=("Segoe UI", 10, "bold"), relief="flat",
-        command=_overwrite, width=10,
-    ).pack(side="left", padx=4)
-    tk.Button(
-        btn_frame, text="Rename", bg=t["accent"], fg=t["bg"],
-        font=("Segoe UI", 10, "bold"), relief="flat",
-        command=_rename, width=10,
-    ).pack(side="left", padx=4)
-    tk.Button(
-        btn_frame, text="Skip", bg=t["btn_bg"], fg=t["btn_fg"],
-        font=("Segoe UI", 10), relief="flat",
-        command=_skip, width=10,
-    ).pack(side="left", padx=4)
+    ctk.CTkButton(
+        btn_frame,
+        text="Overwrite",
+        fg_color=t["danger"],
+        text_color="#ffffff",
+        hover_color="#c9374a",
+        font=ctk.CTkFont(size=11, weight="bold"),
+        corner_radius=8,
+        width=110,
+        command=_overwrite,
+    ).pack(side="left", padx=6)
+
+    ctk.CTkButton(
+        btn_frame,
+        text="Rename",
+        fg_color=t["accent"],
+        text_color="#1e1e2e",
+        hover_color=t["btn_active"],
+        font=ctk.CTkFont(size=11, weight="bold"),
+        corner_radius=8,
+        width=110,
+        command=_rename,
+    ).pack(side="left", padx=6)
+
+    ctk.CTkButton(
+        btn_frame,
+        text="Skip",
+        fg_color=t["btn_bg"],
+        text_color=t["btn_fg"],
+        hover_color=t["muted"],
+        font=ctk.CTkFont(size=11),
+        corner_radius=8,
+        width=110,
+        command=_skip,
+    ).pack(side="left", padx=6)
 
     root.mainloop()
     return result[0]

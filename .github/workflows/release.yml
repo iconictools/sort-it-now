@@ -30,8 +30,43 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: pip install -e .
       - run: pytest --tb=short -q
-      - name: Build executable
+
+      - name: Build executable (Windows / macOS)
+        if: runner.os != 'Linux'
         run: python build.py --onefile
+
+      # ── Linux: onedir + AppImage + plain binary ────────────────────
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libfuse2 python3-tk fuse
+
+      - name: Download appimagetool
+        if: runner.os == 'Linux'
+        run: |
+          wget -q \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: python build.py --appimage
+        env:
+          ARCH: x86_64
+
+      - name: Rename AppImage with version
+        if: runner.os == 'Linux'
+        run: |
+          VERSION=$(python -c 'from file_wayfinder import __version__; print(__version__)')
+          mv dist/FileWayfinder-x86_64.AppImage "dist/FileWayfinder-${VERSION}-x86_64.AppImage"
+
+      - name: Build plain binary (Linux)
+        if: runner.os == 'Linux'
+        run: python build.py --onefile
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -47,6 +82,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

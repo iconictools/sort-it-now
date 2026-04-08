@@ -1,6 +1,6 @@
 """Theme management for File Wayfinder.
 
-Supports dark and light themes for all tkinter windows.
+Supports dark and light themes for all tkinter / customtkinter windows.
 """
 
 from __future__ import annotations
@@ -49,3 +49,18 @@ THEMES: dict[str, dict[str, str]] = {"dark": _DARK, "light": _LIGHT}
 def get_theme(name: str) -> dict[str, str]:
     """Return the color dictionary for *name* (``'dark'`` or ``'light'``)."""
     return THEMES.get(name, _DARK)
+
+
+def apply_ctk_appearance(theme_name: str) -> None:
+    """Configure customtkinter global appearance to match *theme_name*.
+
+    Safe to call even if customtkinter is not installed (no-op in that case).
+    """
+    try:
+        import customtkinter as ctk  # type: ignore[import]
+
+        mode = "Dark" if theme_name == "dark" else "Light"
+        ctk.set_appearance_mode(mode)
+        ctk.set_default_color_theme("blue")
+    except Exception:
+        pass

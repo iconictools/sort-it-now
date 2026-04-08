@@ -83,9 +83,45 @@ jobs:
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: pip install -e .
-      - name: Build executable
+
+      - name: Build executable (Windows / macOS)
+        if: runner.os != 'Linux'
+        run: python build.py --onefile
+
+      # ── Linux: build onedir + AppImage ────────────────────────────────
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
         run: |
-          python build.py --onefile
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libfuse2 python3-tk fuse
+
+      - name: Download appimagetool
+        if: runner.os == 'Linux'
+        run: |
+          wget -q \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: python build.py --appimage
+        env:
+          ARCH: x86_64
+
+      - name: Rename AppImage for release
+        if: runner.os == 'Linux'
+        run: |
+          mv dist/FileWayfinder-x86_64.AppImage \
+             "dist/FileWayfinder-$(python -c 'from file_wayfinder import __version__; print(__version__)')-x86_64.AppImage" \
+             || mv dist/FileWayfinder-x86_64.AppImage dist/FileWayfinder-x86_64.AppImage
+
+      # Also keep a plain binary for Linux users who don't want AppImage
+      - name: Build plain binary (Linux)
+        if: runner.os == 'Linux'
+        run: python build.py --onefile
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -103,9 +139,15 @@ jobs:
         with:
           path: dist-all/
           merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd dist-all
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist-all/**
+          files: |
+            dist-all/**
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,12 +8,21 @@ import sqlite3
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk
 from typing import Any, Callable
 
-from file_wayfinder.themes import get_theme
+import customtkinter as ctk
+
+from file_wayfinder.themes import apply_ctk_appearance, get_theme
 
 logger = logging.getLogger(__name__)
+
+# ── Colour palette used only for the Canvas-drawn heatmap ────────────
+_HEATMAP_COLORS = {
+    "none": "#2a2a3e",
+    "low": "#2d6a2d",
+    "mid": "#3fa53f",
+    "high": "#a6e3a1",
+}
 
 
 def show_dashboard(
@@ -26,45 +35,50 @@ def show_dashboard(
 ) -> None:
     """Open the enhanced dashboard window (blocks until closed)."""
     theme = get_theme(theme_name)
+    apply_ctk_appearance(theme_name)
 
-    root = tk.Tk()
-    root.title("File Wayfinder -- Dashboard")
-    root.configure(bg=theme["bg"])
-    root.geometry("560x520")
+    root = ctk.CTk()
+    root.title("File Wayfinder — Dashboard")
+    root.geometry("600x680")
 
-    tk.Label(
+    # ── Header ────────────────────────────────────────────────────────
+    ctk.CTkLabel(
         root,
-        text="Dashboard",
-        bg=theme["bg"], fg=theme["accent"],
-        font=("Segoe UI", 16, "bold"),
-    ).pack(pady=(16, 8))
+        text="📊 Dashboard",
+        font=ctk.CTkFont(size=18, weight="bold"),
+        text_color=theme["accent"],
+    ).pack(pady=(20, 4))
 
-    # -- Pending files --
+    # ── Pending files notice ──────────────────────────────────────────
     with lock:
         pending = len(batch_queue)
     if pending:
-        tk.Label(
+        ctk.CTkLabel(
             root,
-            text=f"Pending: {pending} file(s) in queue (focus mode)",
-            bg=theme["bg"], fg=theme["danger"],
-            font=("Segoe UI", 10),
+            text=f"⏳ {pending} file(s) pending (focus mode)",
+            font=ctk.CTkFont(size=11),
+            text_color=theme["danger"],
         ).pack(pady=4)
 
-    # -- Sorting stats --
-    stats_frame = tk.Frame(root, bg=theme["bg"])
-    stats_frame.pack(fill="x", padx=24, pady=4)
-
+    # ── Sorting stats ─────────────────────────────────────────────────
     total = history.total_count()
     today = history.count_since(time.time() - 86400)
     week = history.count_since(time.time() - 7 * 86400)
 
-    tk.Label(
-        stats_frame,
-        text=f"Total sorted: {total}   |   Today: {today}   |   This week: {week}",
-        bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 10),
-    ).pack(anchor="w")
+    stats_frame = ctk.CTkFrame(root, corner_radius=10)
+    stats_frame.pack(fill="x", padx=24, pady=8)
+    stats_inner = ctk.CTkFrame(stats_frame, fg_color="transparent")
+    stats_inner.pack(padx=16, pady=12)
 
-    # -- File type / destination taxonomy stats --
+    for label_text, value in [("Total sorted", total), ("Today", today), ("This week", week)]:
+        col = ctk.CTkFrame(stats_inner, fg_color="transparent")
+        col.pack(side="left", padx=20)
+        ctk.CTkLabel(col, text=str(value), font=ctk.CTkFont(size=22, weight="bold"),
+                     text_color=theme["accent"]).pack()
+        ctk.CTkLabel(col, text=label_text, font=ctk.CTkFont(size=10),
+                     text_color=theme["muted"]).pack()
+
+    # ── Taxonomy stats ────────────────────────────────────────────────
     try:
         rows = history.all_moves()
         ext_counts: dict[str, int] = {}
@@ -77,66 +91,56 @@ def show_dashboard(
             dest_name = os.path.basename(os.path.dirname(dst_path))
             if dest_name:
                 dest_counts[dest_name] = dest_counts.get(dest_name, 0) + 1
+
+        tax_frame = ctk.CTkFrame(root, corner_radius=10)
+        tax_frame.pack(fill="x", padx=24, pady=4)
+        tax_inner = ctk.CTkFrame(tax_frame, fg_color="transparent")
+        tax_inner.pack(padx=16, pady=8, fill="x")
+
         if ext_counts:
             top_exts = sorted(ext_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-            ext_str = "  ".join(f"{e}×{c}" for e, c in top_exts)
-            tax_frame = tk.Frame(root, bg=theme["bg"])
-            tax_frame.pack(fill="x", padx=24, pady=(4, 0))
-            tk.Label(
-                tax_frame, text="Top file types:",
-                bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
-            ).pack(side="left")
-            tk.Label(
-                tax_frame, text=ext_str,
-                bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
-            ).pack(side="left", padx=(6, 0))
+            ext_str = "   ".join(f"{e} ×{c}" for e, c in top_exts)
+            row_f = ctk.CTkFrame(tax_inner, fg_color="transparent")
+            row_f.pack(anchor="w", pady=2)
+            ctk.CTkLabel(row_f, text="Top file types: ", font=ctk.CTkFont(size=10, weight="bold"),
+                         text_color=theme["accent"]).pack(side="left")
+            ctk.CTkLabel(row_f, text=ext_str, font=ctk.CTkFont(size=10)).pack(side="left")
+
         if dest_counts:
             top_dests = sorted(dest_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-            dest_str = "  ".join(f"{d}×{c}" for d, c in top_dests)
-            dest_tax_frame = tk.Frame(root, bg=theme["bg"])
-            dest_tax_frame.pack(fill="x", padx=24, pady=(2, 0))
-            tk.Label(
-                dest_tax_frame, text="Top destinations:",
-                bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
-            ).pack(side="left")
-            tk.Label(
-                dest_tax_frame, text=dest_str,
-                bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
-            ).pack(side="left", padx=(6, 0))
+            dest_str = "   ".join(f"{d} ×{c}" for d, c in top_dests)
+            row_f2 = ctk.CTkFrame(tax_inner, fg_color="transparent")
+            row_f2.pack(anchor="w", pady=2)
+            ctk.CTkLabel(row_f2, text="Top destinations: ", font=ctk.CTkFont(size=10, weight="bold"),
+                         text_color=theme["accent"]).pack(side="left")
+            ctk.CTkLabel(row_f2, text=dest_str, font=ctk.CTkFont(size=10)).pack(side="left")
     except (sqlite3.Error, OSError, AttributeError):
         logger.debug("Taxonomy stats unavailable", exc_info=True)
 
-    # -- Inbox Zero progress --
+    # ── Inbox Zero progress bar ───────────────────────────────────────
     if pending > 0 or today > 0:
-        progress_frame = tk.Frame(root, bg=theme["bg"])
+        progress_frame = ctk.CTkFrame(root, fg_color="transparent")
         progress_frame.pack(fill="x", padx=24, pady=4)
         processed = today - pending if today > pending else today
-        ratio = max(0.0, processed / max(today, 1))
-        bar_w = 400
-        canvas = tk.Canvas(
-            progress_frame, width=bar_w, height=20,
-            bg=theme["list_bg"], highlightthickness=0,
-        )
-        canvas.pack(anchor="w")
-        fill_w = int(bar_w * ratio)
-        canvas.create_rectangle(
-            0, 0, fill_w, 20, fill=theme["success"], outline=""
-        )
-        pct = int(ratio * 100)
-        tk.Label(
+        ratio = max(0.0, min(1.0, processed / max(today, 1)))
+        ctk.CTkLabel(
             progress_frame,
-            text=f"Inbox Zero: {pct}%",
-            bg=theme["bg"], fg=theme["success"],
-            font=("Segoe UI", 9),
+            text=f"Inbox Zero: {int(ratio * 100)}%",
+            font=ctk.CTkFont(size=10),
+            text_color=theme["success"],
         ).pack(anchor="w")
+        ctk.CTkProgressBar(progress_frame, width=540, progress_color=theme["success"]).pack(
+            anchor="w", pady=(2, 0)
+        )
 
-    # -- Activity Heatmap (last 84 days = 12 weeks) --
-    heatmap_frame = tk.Frame(root, bg=theme["bg"])
-    heatmap_frame.pack(fill="x", padx=24, pady=(8, 4))
-    tk.Label(
-        heatmap_frame, text="Activity (last 12 weeks):",
-        bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
-    ).pack(anchor="w")
+    # ── Activity heatmap (last 84 days = 12 weeks) ────────────────────
+    heatmap_frame = ctk.CTkFrame(root, corner_radius=10)
+    heatmap_frame.pack(fill="x", padx=24, pady=8)
+    ctk.CTkLabel(
+        heatmap_frame, text="Activity — last 12 weeks",
+        font=ctk.CTkFont(size=10, weight="bold"),
+        text_color=theme["accent"],
+    ).pack(anchor="w", padx=16, pady=(10, 4))
 
     day_counts: dict[int, int] = {}
     try:
@@ -146,22 +150,21 @@ def show_dashboard(
     except Exception:
         pass
 
-    cell_size = 14
+    cell_size = 13
     gap = 2
     weeks = 12
     days_per_week = 7
-    hm_w = cell_size * weeks + gap * (weeks - 1)
+    hm_w = cell_size * weeks + gap * (weeks - 1) + 4
     hm_h = cell_size * days_per_week + gap * (days_per_week - 1)
     hm_canvas = tk.Canvas(
         heatmap_frame, width=hm_w, height=hm_h,
         bg=theme["bg"], highlightthickness=0,
     )
-    hm_canvas.pack(anchor="w", pady=(4, 0))
+    hm_canvas.pack(anchor="w", padx=16, pady=(0, 10))
 
     today_day = int(time.time() // 86400)
     total_cells = weeks * days_per_week
     for cell_idx in range(total_cells):
-        # cell 0 = oldest, last cell = today (bottom-right)
         day_offset = total_cells - 1 - cell_idx
         day_key = today_day - day_offset
         count = day_counts.get(day_key, 0)
@@ -172,78 +175,78 @@ def show_dashboard(
         x1 = x0 + cell_size
         y1 = y0 + cell_size
         if count == 0:
-            color = theme["bg"]
+            color = _HEATMAP_COLORS["none"]
         elif count <= 2:
-            color = "#2d6a2d"
+            color = _HEATMAP_COLORS["low"]
         elif count <= 5:
-            color = "#3fa53f"
+            color = _HEATMAP_COLORS["mid"]
         else:
-            color = theme["success"]
-        hm_canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline=theme["list_bg"])
+            color = _HEATMAP_COLORS["high"]
+        hm_canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline="")
 
-    # -- Achievements --
-    from file_wayfinder.achievements import Achievements
-
-    ach_label_frame = tk.Frame(root, bg=theme["bg"])
-    ach_label_frame.pack(fill="x", padx=24, pady=(8, 2))
-    tk.Label(
-        ach_label_frame, text="Achievements:",
-        bg=theme["bg"], fg=theme["accent"], font=("Segoe UI", 9, "bold"),
-    ).pack(anchor="w")
-
+    # ── Achievements ──────────────────────────────────────────────────
     try:
+        from file_wayfinder.achievements import Achievements
+
         ach_db = os.path.join(os.path.dirname(config.path), "achievements.db")
         achs = Achievements(ach_db)
         all_achs = achs.all_status()
         achs.close()
-        ach_grid = tk.Frame(root, bg=theme["bg"])
-        ach_grid.pack(fill="x", padx=24, pady=(0, 4))
+
+        ach_frame = ctk.CTkFrame(root, corner_radius=10)
+        ach_frame.pack(fill="x", padx=24, pady=4)
+        ctk.CTkLabel(
+            ach_frame, text="🏆 Achievements",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            text_color=theme["accent"],
+        ).pack(anchor="w", padx=16, pady=(10, 4))
+
+        ach_grid = ctk.CTkFrame(ach_frame, fg_color="transparent")
+        ach_grid.pack(padx=16, pady=(0, 10), fill="x")
         for idx, ach in enumerate(all_achs):
-            col = idx % 3
-            row = idx // 3
-            fg_color = theme["success"] if ach.unlocked else theme["muted"]
-            tk.Label(
+            col_idx = idx % 3
+            row_idx = idx // 3
+            color = theme["success"] if ach.unlocked else theme["muted"]
+            ctk.CTkLabel(
                 ach_grid,
                 text=f"{ach.emoji} {ach.name}",
-                bg=theme["bg"], fg=fg_color,
-                font=("Segoe UI", 9),
+                font=ctk.CTkFont(size=10),
+                text_color=color,
                 anchor="w",
-            ).grid(row=row, column=col, sticky="w", padx=(0, 8), pady=1)
+            ).grid(row=row_idx, column=col_idx, sticky="w", padx=(0, 12), pady=1)
     except Exception:
         logger.debug("Achievements panel unavailable", exc_info=True)
 
-    # -- Rules summary --
-    from file_wayfinder.rules import Rules
-
+    # ── Rules summary ─────────────────────────────────────────────────
     rules_count = 0
     try:
-        # Try to access rules through the config path
-        rules_path = os.path.join(
-            os.path.dirname(config.path), "rules.json"
-        )
+        from file_wayfinder.rules import Rules
+
+        rules_path = os.path.join(os.path.dirname(config.path), "rules.json")
         if os.path.exists(rules_path):
             tmp_rules = Rules(rules_path)
             rules_count = len(tmp_rules.extension_map)
     except (OSError, AttributeError):
         pass
 
-    tk.Label(
+    ctk.CTkLabel(
         root,
         text=f"Active rules: {rules_count}",
-        bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 10),
-    ).pack(padx=24, anchor="w", pady=(8, 4))
+        font=ctk.CTkFont(size=10),
+    ).pack(padx=24, anchor="w", pady=(4, 4))
 
-    # -- Undo history with clickable checkpoints --
-    tk.Label(
+    # ── Undo history ──────────────────────────────────────────────────
+    ctk.CTkLabel(
         root,
-        text="Recent Actions (click to undo back to that point):",
-        bg=theme["bg"], fg=theme["accent"],
-        font=("Segoe UI", 11, "bold"),
-    ).pack(pady=(12, 4), padx=24, anchor="w")
+        text="Recent Actions (select to undo back to that point):",
+        font=ctk.CTkFont(size=11, weight="bold"),
+        text_color=theme["accent"],
+    ).pack(pady=(8, 4), padx=24, anchor="w")
 
-    history_frame = tk.Frame(root, bg=theme["bg"])
+    history_frame = ctk.CTkFrame(root, fg_color="transparent")
     history_frame.pack(fill="both", expand=True, padx=24, pady=4)
 
+    # Use tk.Listbox (no CTk equivalent) styled to match the theme
     scrollbar = tk.Scrollbar(history_frame)
     scrollbar.pack(side="right", fill="y")
 
@@ -252,7 +255,7 @@ def show_dashboard(
         bg=theme["list_bg"], fg=theme["list_fg"],
         selectbackground=theme["list_select_bg"],
         selectforeground=theme["list_select_fg"],
-        font=("Segoe UI", 9), relief="flat",
+        font=("TkDefaultFont", 9), relief="flat",
         yscrollcommand=scrollbar.set,
     )
     history_list.pack(fill="both", expand=True)
@@ -263,9 +266,7 @@ def show_dashboard(
         status = "[undone]" if action["undone"] else "[done]"
         src_name = os.path.basename(action["src_path"])
         dst_name = os.path.basename(os.path.dirname(action["dst_path"]))
-        history_list.insert(
-            "end", f"{status}  {src_name}  ->  {dst_name}"
-        )
+        history_list.insert("end", f"{status}  {src_name}  →  {dst_name}")
 
     def _undo_to_selected() -> None:
         sel = history_list.curselection()
@@ -282,33 +283,31 @@ def show_dashboard(
                     undone_count += 1
         if undone_count:
             logger.info("Bulk undone %d action(s).", undone_count)
-        # Refresh list
         history_list.delete(0, "end")
-        refreshed = history.recent(50)
-        for action in refreshed:
+        for action in history.recent(50):
             status = "[undone]" if action["undone"] else "[done]"
             src_name = os.path.basename(action["src_path"])
-            dst_name = os.path.basename(
-                os.path.dirname(action["dst_path"])
-            )
-            history_list.insert(
-                "end", f"{status}  {src_name}  ->  {dst_name}"
-            )
+            dst_name = os.path.basename(os.path.dirname(action["dst_path"]))
+            history_list.insert("end", f"{status}  {src_name}  →  {dst_name}")
 
-    btn_frame = tk.Frame(root, bg=theme["bg"])
-    btn_frame.pack(pady=8)
-    tk.Button(
+    btn_frame = ctk.CTkFrame(root, fg_color="transparent")
+    btn_frame.pack(pady=10)
+    ctk.CTkButton(
         btn_frame, text="Undo to selected",
-        bg=theme["accent"], fg=theme["bg"],
-        font=("Segoe UI", 10, "bold"), relief="flat",
+        fg_color=theme["accent"], text_color="#1e1e2e",
+        hover_color=theme["btn_active"],
+        font=ctk.CTkFont(size=10, weight="bold"),
+        corner_radius=8,
         command=_undo_to_selected,
-    ).pack(side="left", padx=4)
-    tk.Button(
+    ).pack(side="left", padx=6)
+    ctk.CTkButton(
         btn_frame, text="Close",
-        bg=theme["btn_bg"], fg=theme["btn_fg"],
-        font=("Segoe UI", 10), relief="flat",
+        fg_color=theme["btn_bg"], text_color=theme["btn_fg"],
+        hover_color=theme["muted"],
+        font=ctk.CTkFont(size=10),
+        corner_radius=8,
         command=root.destroy,
-    ).pack(side="left", padx=4)
+    ).pack(side="left", padx=6)
 
     root.mainloop()
 
@@ -323,32 +322,23 @@ def show_batch_list(
 ) -> None:
     """Show a batch processing window listing all pending files."""
     theme = get_theme(theme_name)
+    apply_ctk_appearance(theme_name)
 
-    root = tk.Tk()
-    root.title("File Wayfinder -- Batch Processing")
-    root.configure(bg=theme["bg"])
-    root.geometry("600x400")
+    root = ctk.CTk()
+    root.title("File Wayfinder — Batch Processing")
+    root.geometry("640x480")
 
-    tk.Label(
+    ctk.CTkLabel(
         root,
         text=f"Batch: {len(queue)} file(s) pending",
-        bg=theme["bg"], fg=theme["accent"],
-        font=("Segoe UI", 14, "bold"),
-    ).pack(pady=(16, 8))
+        font=ctk.CTkFont(size=16, weight="bold"),
+        text_color=theme["accent"],
+    ).pack(pady=(20, 10))
 
-    canvas = tk.Canvas(root, bg=theme["bg"], highlightthickness=0)
-    scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
-    inner = tk.Frame(canvas, bg=theme["bg"])
-    inner.bind(
-        "<Configure>",
-        lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-    )
-    canvas.create_window((0, 0), window=inner, anchor="nw", width=560)
-    canvas.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
-    canvas.pack(fill="both", expand=True, padx=16, pady=4)
-
-    dest_vars: list[tuple[str, tk.StringVar]] = []
+    scroll = ctk.CTkScrollableFrame(root, height=320)
+    scroll.pack(fill="x", padx=24, pady=4)
+    scroll.grid_columnconfigure(0, weight=3)
+    scroll.grid_columnconfigure(1, weight=2)
 
     all_dests: list[str] = []
     for folder in config.monitored_folders:
@@ -357,31 +347,31 @@ def show_batch_list(
                 all_dests.append(d)
 
     if not all_dests:
-        tk.Label(
-            inner,
+        ctk.CTkLabel(
+            scroll,
             text="No destinations configured. Add folders in Settings.",
-            bg=theme["bg"], fg=theme["danger"], font=("Segoe UI", 10),
+            text_color=theme["danger"],
         ).pack(pady=8)
 
-    for filepath in queue:
+    dest_vars: list[tuple[str, tk.StringVar]] = []
+    for row_idx, filepath in enumerate(queue):
         if not os.path.exists(filepath):
             continue
-        row = tk.Frame(inner, bg=theme["bg"])
-        row.pack(fill="x", pady=2)
-
-        tk.Label(
-            row, text=os.path.basename(filepath),
-            bg=theme["bg"], fg=theme["fg"], font=("Segoe UI", 9),
-            width=30, anchor="w",
-        ).pack(side="left")
+        ctk.CTkLabel(
+            scroll,
+            text=os.path.basename(filepath),
+            font=ctk.CTkFont(size=10),
+            anchor="w",
+        ).grid(row=row_idx, column=0, sticky="ew", pady=3, padx=(4, 8))
 
         dest_var = tk.StringVar(value=all_dests[0] if all_dests else "")
         if all_dests:
-            menu = ttk.Combobox(
-                row, textvariable=dest_var, values=all_dests,
-                state="readonly", width=30,
-            )
-            menu.pack(side="left", padx=4)
+            ctk.CTkOptionMenu(
+                scroll,
+                variable=dest_var,
+                values=all_dests,
+                font=ctk.CTkFont(size=10),
+            ).grid(row=row_idx, column=1, sticky="ew", pady=3)
         dest_vars.append((filepath, dest_var))
 
     def _process_all() -> None:
@@ -392,19 +382,23 @@ def show_batch_list(
                 rules.record_action(filepath, dest)
         root.destroy()
 
-    btn_frame = tk.Frame(root, bg=theme["bg"])
-    btn_frame.pack(pady=8)
-    tk.Button(
+    btn_frame = ctk.CTkFrame(root, fg_color="transparent")
+    btn_frame.pack(pady=12)
+    ctk.CTkButton(
         btn_frame, text="Move All",
-        bg=theme["accent"], fg=theme["bg"],
-        font=("Segoe UI", 10, "bold"), relief="flat",
+        fg_color=theme["accent"], text_color="#1e1e2e",
+        hover_color=theme["btn_active"],
+        font=ctk.CTkFont(size=11, weight="bold"),
+        corner_radius=8,
         command=_process_all,
-    ).pack(side="left", padx=4)
-    tk.Button(
+    ).pack(side="left", padx=6)
+    ctk.CTkButton(
         btn_frame, text="Cancel",
-        bg=theme["btn_bg"], fg=theme["btn_fg"],
-        font=("Segoe UI", 10), relief="flat",
+        fg_color=theme["btn_bg"], text_color=theme["btn_fg"],
+        hover_color=theme["muted"],
+        font=ctk.CTkFont(size=11),
+        corner_radius=8,
         command=root.destroy,
-    ).pack(side="left", padx=4)
+    ).pack(side="left", padx=6)
 
     root.mainloop()

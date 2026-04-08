@@ -1,4 +1,4 @@
-"""Rule management UI for File Wayfinder (tkinter-based).
+"""Rule management UI for File Wayfinder (customtkinter-based).
 
 Lets the user view, edit, and delete learned auto-sort rules.
 """
@@ -11,7 +11,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING
 
-from file_wayfinder.themes import get_theme
+import customtkinter as ctk
+
+from file_wayfinder.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
     from file_wayfinder.config import Config
@@ -23,36 +25,45 @@ logger = logging.getLogger(__name__)
 class RulesDialog:
     """Window to manage learned auto-sort rules."""
 
-    def __init__(self, rules: Rules, config: Config) -> None:
+    def __init__(self, rules: "Rules", config: "Config") -> None:
         self._rules = rules
-        self._theme = get_theme(config.get_setting("theme", "dark"))
+        self._theme_name = config.get_setting("theme", "dark")
+        self._theme = get_theme(self._theme_name)
 
     def show(self) -> None:
         """Display the rule management dialog."""
         t = self._theme
-        root = tk.Tk()
-        root.title("File Wayfinder -- Rules")
-        root.configure(bg=t["bg"])
-        root.resizable(False, False)
+        apply_ctk_appearance(self._theme_name)
 
-        w, h = 520, 640
+        root = ctk.CTk()
+        root.title("File Wayfinder — Rules")
+        root.resizable(True, True)
+
+        w, h = 560, 680
         sx = root.winfo_screenwidth() // 2 - w // 2
         sy = root.winfo_screenheight() // 2 - h // 2
         root.geometry(f"{w}x{h}+{sx}+{sy}")
 
-        tk.Label(
-            root, text="Auto-Sort Rules",
-            bg=t["bg"], fg=t["accent"],
-            font=("Segoe UI", 16, "bold"),
-        ).pack(pady=(16, 4))
-        tk.Label(
+        ctk.CTkLabel(
+            root, text="⚙ Auto-Sort Rules",
+            font=ctk.CTkFont(size=17, weight="bold"),
+            text_color=t["accent"],
+        ).pack(pady=(20, 4))
+        ctk.CTkLabel(
             root,
             text="Extensions are mapped to destination folders.",
-            bg=t["bg"], fg=t["muted"], font=("Segoe UI", 9),
+            font=ctk.CTkFont(size=10),
+            text_color=t["muted"],
         ).pack(pady=(0, 8))
 
-        # Rule list
-        list_frame = tk.Frame(root, bg=t["bg"])
+        # ── Extension rules list ──────────────────────────────────────
+        ctk.CTkLabel(
+            root, text="Extension Rules",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=t["accent"],
+        ).pack(anchor="w", padx=24, pady=(4, 2))
+
+        list_frame = tk.Frame(root, bg=t["list_bg"])
         list_frame.pack(fill="both", expand=True, padx=24, pady=4)
 
         scrollbar = tk.Scrollbar(list_frame)
@@ -63,7 +74,7 @@ class RulesDialog:
             bg=t["list_bg"], fg=t["list_fg"],
             selectbackground=t["list_select_bg"],
             selectforeground=t["list_select_fg"],
-            font=("Segoe UI", 10), relief="flat",
+            font=("TkDefaultFont", 10), relief="flat",
             yscrollcommand=scrollbar.set,
         )
         listbox.pack(fill="both", expand=True)
@@ -73,30 +84,30 @@ class RulesDialog:
             listbox.delete(0, "end")
             for ext, dest in sorted(self._rules.extension_map.items()):
                 dest_name = os.path.basename(dest) if os.path.sep in dest else dest
-                listbox.insert("end", f"{ext}  ->  {dest_name}  ({dest})")
+                listbox.insert("end", f"  {ext}  →  {dest_name}  ({dest})")
 
         _refresh()
 
-        # Buttons
-        btn_frame = tk.Frame(root, bg=t["bg"])
-        btn_frame.pack(pady=8)
+        # Buttons for extension rules
+        btn_frame = ctk.CTkFrame(root, fg_color="transparent")
+        btn_frame.pack(pady=6)
 
         def _add_rule() -> None:
-            dlg = tk.Toplevel(root)
+            dlg = ctk.CTkToplevel(root)
             dlg.title("Add Rule")
-            dlg.configure(bg=t["bg"])
-            dlg.geometry("320x150")
+            dlg.geometry("340x180")
             dlg.attributes("-topmost", True)
+            dlg.grab_set()
 
-            tk.Label(
-                dlg, text="Extension (e.g. .pdf):", bg=t["bg"], fg=t["fg"],
-                font=("Segoe UI", 10),
-            ).pack(pady=(12, 2))
-            ext_entry = tk.Entry(
-                dlg, bg=t["entry_bg"], fg=t["entry_fg"],
-                font=("Segoe UI", 10),
+            ctk.CTkLabel(
+                dlg, text="Extension (e.g. .pdf):",
+                font=ctk.CTkFont(size=11),
+            ).pack(pady=(16, 4))
+            ext_entry = ctk.CTkEntry(
+                dlg, font=ctk.CTkFont(size=11),
+                border_color=t["accent"],
             )
-            ext_entry.pack(padx=20, fill="x")
+            ext_entry.pack(padx=24, fill="x")
 
             def _pick_and_save() -> None:
                 ext = ext_entry.get().strip()
@@ -110,18 +121,21 @@ class RulesDialog:
                     _refresh()
                     dlg.destroy()
 
-            tk.Button(
-                dlg, text="Choose destination...", bg=t["accent"], fg=t["bg"],
-                font=("Segoe UI", 10, "bold"), relief="flat",
+            ctk.CTkButton(
+                dlg, text="Choose destination…",
+                fg_color=t["accent"], text_color="#1e1e2e",
+                hover_color=t["btn_active"],
+                font=ctk.CTkFont(size=11, weight="bold"),
+                corner_radius=8,
                 command=_pick_and_save,
-            ).pack(pady=12)
+            ).pack(pady=16)
 
         def _edit_rule() -> None:
             sel = listbox.curselection()
             if not sel:
                 return
             text = listbox.get(sel[0])
-            ext = text.split("  ->  ")[0].strip()
+            ext = text.strip().split("  →  ")[0].strip()
             dest = filedialog.askdirectory(
                 title=f"New destination for {ext}", parent=root
             )
@@ -134,43 +148,46 @@ class RulesDialog:
             if not sel:
                 return
             text = listbox.get(sel[0])
-            ext = text.split("  ->  ")[0].strip()
+            ext = text.strip().split("  →  ")[0].strip()
             if messagebox.askyesno(
                 "Delete rule", f"Remove the rule for {ext}?", parent=root
             ):
                 self._rules.remove_rule(ext)
                 _refresh()
 
-        tk.Button(
-            btn_frame, text="+ Add", bg=t["accent"], fg=t["bg"],
-            font=("Segoe UI", 10, "bold"), relief="flat", command=_add_rule,
-            width=8,
+        ctk.CTkButton(
+            btn_frame, text="+ Add",
+            fg_color=t["accent"], text_color="#1e1e2e",
+            hover_color=t["btn_active"],
+            font=ctk.CTkFont(size=10, weight="bold"),
+            corner_radius=8, width=90,
+            command=_add_rule,
         ).pack(side="left", padx=4)
-        tk.Button(
-            btn_frame, text="Edit", bg=t["btn_bg"], fg=t["btn_fg"],
-            font=("Segoe UI", 10), relief="flat", command=_edit_rule,
-            width=8,
+        ctk.CTkButton(
+            btn_frame, text="Edit",
+            fg_color=t["btn_bg"], text_color=t["btn_fg"],
+            hover_color=t["muted"],
+            font=ctk.CTkFont(size=10),
+            corner_radius=8, width=90,
+            command=_edit_rule,
         ).pack(side="left", padx=4)
-        tk.Button(
-            btn_frame, text="Delete", bg=t["danger"], fg="#ffffff",
-            font=("Segoe UI", 10, "bold"), relief="flat",
-            command=_delete_rule, width=8,
+        ctk.CTkButton(
+            btn_frame, text="Delete",
+            fg_color=t["danger"], text_color="#ffffff",
+            hover_color="#c9374a",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            corner_radius=8, width=90,
+            command=_delete_rule,
         ).pack(side="left", padx=4)
 
-        tk.Button(
-            root, text="Close", bg=t["btn_bg"], fg=t["btn_fg"],
-            font=("Segoe UI", 10), relief="flat", command=root.destroy,
-            width=10,
-        ).pack(pady=(0, 12))
+        # ── Pattern rules section ─────────────────────────────────────
+        ctk.CTkLabel(
+            root, text="Pattern Rules (glob/regex)",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=t["accent"],
+        ).pack(anchor="w", padx=24, pady=(12, 4))
 
-        # -- Pattern Rules Section --
-        tk.Label(
-            root, text="Pattern Rules (glob/regex):",
-            bg=t["bg"], fg=t["accent"],
-            font=("Segoe UI", 12, "bold"),
-        ).pack(pady=(4, 4), padx=24, anchor="w")
-
-        pat_frame = tk.Frame(root, bg=t["bg"])
+        pat_frame = tk.Frame(root, bg=t["list_bg"])
         pat_frame.pack(fill="both", expand=True, padx=24, pady=4)
 
         pat_scrollbar = tk.Scrollbar(pat_frame)
@@ -181,7 +198,7 @@ class RulesDialog:
             bg=t["list_bg"], fg=t["list_fg"],
             selectbackground=t["list_select_bg"],
             selectforeground=t["list_select_fg"],
-            font=("Segoe UI", 10), relief="flat",
+            font=("TkDefaultFont", 10), relief="flat",
             yscrollcommand=pat_scrollbar.set,
         )
         pat_listbox.pack(fill="both", expand=True)
@@ -193,43 +210,41 @@ class RulesDialog:
                 dest_name = os.path.basename(rule["destination"])
                 pat_listbox.insert(
                     "end",
-                    f"[{rule.get('type', 'glob')}]  "
-                    f"{rule['pattern']}  ->  {dest_name}",
+                    f"  [{rule.get('type', 'glob')}]  "
+                    f"{rule['pattern']}  →  {dest_name}",
                 )
 
         _refresh_patterns()
 
-        pat_btn_frame = tk.Frame(root, bg=t["bg"])
-        pat_btn_frame.pack(pady=4)
+        pat_btn_frame = ctk.CTkFrame(root, fg_color="transparent")
+        pat_btn_frame.pack(pady=6)
 
         def _add_pattern_rule() -> None:
-            dlg = tk.Toplevel(root)
+            dlg = ctk.CTkToplevel(root)
             dlg.title("Add Pattern Rule")
-            dlg.configure(bg=t["bg"])
-            dlg.geometry("360x220")
+            dlg.geometry("380x240")
             dlg.attributes("-topmost", True)
+            dlg.grab_set()
 
-            tk.Label(
+            ctk.CTkLabel(
                 dlg, text="Pattern (e.g. invoice*.pdf):",
-                bg=t["bg"], fg=t["fg"], font=("Segoe UI", 10),
-            ).pack(pady=(12, 2))
-            pat_entry = tk.Entry(
-                dlg, bg=t["entry_bg"], fg=t["entry_fg"],
-                font=("Segoe UI", 10),
+                font=ctk.CTkFont(size=11),
+            ).pack(pady=(16, 4))
+            pat_entry = ctk.CTkEntry(
+                dlg, font=ctk.CTkFont(size=11),
+                border_color=t["accent"],
             )
-            pat_entry.pack(padx=20, fill="x")
+            pat_entry.pack(padx=24, fill="x")
 
-            tk.Label(
-                dlg, text="Type:", bg=t["bg"], fg=t["fg"],
-                font=("Segoe UI", 10),
-            ).pack(pady=(8, 2))
+            ctk.CTkLabel(
+                dlg, text="Type:",
+                font=ctk.CTkFont(size=11),
+            ).pack(pady=(12, 4))
             type_var = tk.StringVar(value="glob")
-            type_menu = tk.OptionMenu(dlg, type_var, "glob", "regex")
-            type_menu.config(
-                bg=t["btn_bg"], fg=t["btn_fg"], font=("Segoe UI", 10),
-                relief="flat",
-            )
-            type_menu.pack()
+            ctk.CTkOptionMenu(
+                dlg, variable=type_var, values=["glob", "regex"],
+                font=ctk.CTkFont(size=11),
+            ).pack()
 
             def _pick_dest() -> None:
                 pat = pat_entry.get().strip()
@@ -239,18 +254,18 @@ class RulesDialog:
                     title=f"Destination for {pat}", parent=dlg
                 )
                 if dest:
-                    self._rules.set_pattern_rule(
-                        pat, dest, type_var.get()
-                    )
+                    self._rules.set_pattern_rule(pat, dest, type_var.get())
                     _refresh_patterns()
                     dlg.destroy()
 
-            tk.Button(
-                dlg, text="Choose destination...",
-                bg=t["accent"], fg=t["bg"],
-                font=("Segoe UI", 10, "bold"), relief="flat",
+            ctk.CTkButton(
+                dlg, text="Choose destination…",
+                fg_color=t["accent"], text_color="#1e1e2e",
+                hover_color=t["btn_active"],
+                font=ctk.CTkFont(size=11, weight="bold"),
+                corner_radius=8,
                 command=_pick_dest,
-            ).pack(pady=12)
+            ).pack(pady=16)
 
         def _delete_pattern_rule() -> None:
             sel = pat_listbox.curselection()
@@ -267,17 +282,30 @@ class RulesDialog:
                     self._rules.remove_pattern_rule(pattern)
                     _refresh_patterns()
 
-        tk.Button(
+        ctk.CTkButton(
             pat_btn_frame, text="+ Add Pattern",
-            bg=t["accent"], fg=t["bg"],
-            font=("Segoe UI", 10, "bold"), relief="flat",
-            command=_add_pattern_rule, width=12,
+            fg_color=t["accent"], text_color="#1e1e2e",
+            hover_color=t["btn_active"],
+            font=ctk.CTkFont(size=10, weight="bold"),
+            corner_radius=8, width=120,
+            command=_add_pattern_rule,
         ).pack(side="left", padx=4)
-        tk.Button(
+        ctk.CTkButton(
             pat_btn_frame, text="Delete Pattern",
-            bg=t["danger"], fg="#ffffff",
-            font=("Segoe UI", 10, "bold"), relief="flat",
-            command=_delete_pattern_rule, width=12,
+            fg_color=t["danger"], text_color="#ffffff",
+            hover_color="#c9374a",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            corner_radius=8, width=120,
+            command=_delete_pattern_rule,
         ).pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            root, text="Close",
+            fg_color=t["btn_bg"], text_color=t["btn_fg"],
+            hover_color=t["muted"],
+            font=ctk.CTkFont(size=11),
+            corner_radius=8, width=100,
+            command=root.destroy,
+        ).pack(pady=(4, 16))
 
         root.mainloop()
