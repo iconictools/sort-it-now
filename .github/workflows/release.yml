@@ -35,6 +35,15 @@ jobs:
         if: runner.os != 'Linux'
         run: python build.py --onefile
 
+      - name: Rename Windows binary
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv dist/file-wayfinder.exe "dist/FileWayfinder-windows-x86_64.exe"
+
+      - name: Rename macOS binary
+        if: runner.os == 'macOS'
+        run: mv dist/file-wayfinder "dist/FileWayfinder-macos-arm64"
+
       # ── Linux: onedir + AppImage + plain binary ────────────────────
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'

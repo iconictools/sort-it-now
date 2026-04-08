@@ -30,24 +30,27 @@ def _linux_desktop_path() -> str:
     return os.path.join(autostart_dir, _DESKTOP_FILENAME)
 
 
-def _linux_exec_cmd() -> str:
-    """Return the command used to launch the app on Linux."""
+def _frozen_or_module_cmd() -> str:
+    """Return the shell command used to launch the app on this platform."""
     if getattr(sys, "frozen", False):
         return sys.executable
     return f"{sys.executable} -m file_wayfinder"
+
+
+def _linux_exec_cmd() -> str:
+    """Return the command used to launch the app on Linux."""
+    return _frozen_or_module_cmd()
+
+
+def _macos_exec_cmd() -> str:
+    """Return the command used to launch the app on macOS."""
+    return _frozen_or_module_cmd()
 
 
 def _macos_plist_path() -> str:
     """Return the LaunchAgent plist file path for macOS."""
     launch_agents_dir = os.path.expanduser("~/Library/LaunchAgents")
     return os.path.join(launch_agents_dir, _MACOS_PLIST_FILENAME)
-
-
-def _macos_exec_cmd() -> str:
-    """Return the command used to launch the app on macOS."""
-    if getattr(sys, "frozen", False):
-        return sys.executable
-    return f"{sys.executable} -m file_wayfinder"
 
 
 def is_autostart_enabled() -> bool:

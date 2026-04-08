@@ -88,6 +88,15 @@ jobs:
         if: runner.os != 'Linux'
         run: python build.py --onefile
 
+      - name: Rename Windows binary
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv dist/file-wayfinder.exe "dist/FileWayfinder-windows-x86_64.exe"
+
+      - name: Rename macOS binary
+        if: runner.os == 'macOS'
+        run: mv dist/file-wayfinder "dist/FileWayfinder-macos-arm64"
+
       # ── Linux: build onedir + AppImage ────────────────────────────────
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -113,9 +122,9 @@ jobs:
       - name: Rename AppImage for release
         if: runner.os == 'Linux'
         run: |
+          VERSION=$(python -c 'from file_wayfinder import __version__; print(__version__)')
           mv dist/FileWayfinder-x86_64.AppImage \
-             "dist/FileWayfinder-$(python -c 'from file_wayfinder import __version__; print(__version__)')-x86_64.AppImage" \
-             || mv dist/FileWayfinder-x86_64.AppImage dist/FileWayfinder-x86_64.AppImage
+             "dist/FileWayfinder-${VERSION}-x86_64.AppImage"
 
       # Also keep a plain binary for Linux users who don't want AppImage
       - name: Build plain binary (Linux)

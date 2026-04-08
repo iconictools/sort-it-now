@@ -129,9 +129,9 @@ def show_dashboard(
             font=ctk.CTkFont(size=10),
             text_color=theme["success"],
         ).pack(anchor="w")
-        ctk.CTkProgressBar(progress_frame, width=540, progress_color=theme["success"]).pack(
-            anchor="w", pady=(2, 0)
-        )
+        pbar = ctk.CTkProgressBar(progress_frame, width=540, progress_color=theme["success"])
+        pbar.set(ratio)
+        pbar.pack(anchor="w", pady=(2, 0))
 
     # ── Activity heatmap (last 84 days = 12 weeks) ────────────────────
     heatmap_frame = ctk.CTkFrame(root, corner_radius=10)
