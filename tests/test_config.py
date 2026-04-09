@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from file_wayfinder.config import Config
+from iconic_filer.config import Config
 
 
 class TestConfig:

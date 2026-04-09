@@ -1,4 +1,4 @@
-# File Wayfinder 🗂️
+# Iconic Filer 🗂️
 
 > Tray-resident real-time file organizer assistant — put your files where you want, *right when they arrive*.
 
@@ -6,15 +6,15 @@
 
 ## What it does
 
-File Wayfinder lives in your system tray and watches folders you choose (Downloads, Desktop, Screenshots, etc.). When a new file appears it asks you **"Where should this go?"** with a quick popup showing your configured destinations.
+Iconic Filer lives in your system tray and watches folders you choose (Downloads, Desktop, Screenshots, etc.). When a new file appears it asks you **"Where should this go?"** with a quick popup showing your configured destinations.
 
 Instead of dumping files and cleaning up later, you make a micro-decision at the moment of action — building a tidy file system as a habit.
 
 ### Design philosophy
 
-**File Wayfinder never moves a file without your say-so.**
+**Iconic Filer never moves a file without your say-so.**
 
-Every other file-watching tool eventually starts sorting files automatically (auto-learn rules, frequency heuristics, ML classifiers). File Wayfinder deliberately does *not*. The point is that *you* are making the decision — the tool is just surfacing it at the right moment and making it instant. You can set explicit pattern rules (glob / regex) for repetitive cases, but nothing happens behind your back.
+Every other file-watching tool eventually starts sorting files automatically (auto-learn rules, frequency heuristics, ML classifiers). Iconic Filer deliberately does *not*. The point is that *you* are making the decision — the tool is just surfacing it at the right moment and making it instant. You can set explicit pattern rules (glob / regex) for repetitive cases, but nothing happens behind your back.
 
 ### Features
 
@@ -23,7 +23,7 @@ Every other file-watching tool eventually starts sorting files automatically (au
 | **Real-time monitoring** | Detects new, moved, and modified files instantly via `watchdog` |
 | **Smart prompts** | Non-intrusive popup with context-aware destination suggestions |
 | **File preview** | Image thumbnails, text file previews, and file type labels in the prompt |
-| **Always asks — no auto-sorting** | File Wayfinder **never** moves a file without your confirmation. Every tool auto-sorts eventually — this one doesn't. Your choices stay yours. |
+| **Always asks — no auto-sorting** | Iconic Filer **never** moves a file without your confirmation. Every tool auto-sorts eventually — this one doesn't. Your choices stay yours. |
 | **Pattern rules** | Glob and regex rules (e.g. `invoice*.pdf` → Finances) that you set explicitly |
 | **Smart download detection** | On Linux uses inotify `IN_CLOSE_WRITE` (fired the instant the browser closes the file) as the primary signal; falls back to size + mtime polling with exponential backoff on all platforms; on Windows confirms the file is not exclusively locked before prompting |
 | **Rename on move** | Configurable rename patterns with `{name}`, `{date}`, `{ext}` tokens |
@@ -58,14 +58,14 @@ Head to the [Releases](https://github.com/trabalhefabricio/sort-it-now/releases)
 
 | Platform | Download |
 |---|---|
-| **Linux** | `FileWayfinder-<version>-x86_64.AppImage` — make executable, double-click to run |
-| **Windows** | `file-wayfinder.exe` — run directly, no installer needed |
-| **macOS** | `file-wayfinder` — run from Terminal or double-click |
+| **Linux** | `IconicFiler-<version>-x86_64.AppImage` — make executable, double-click to run |
+| **Windows** | `iconic-filer.exe` — run directly, no installer needed |
+| **macOS** | `iconic-filer` — run from Terminal or double-click |
 
 #### Linux AppImage quick start
 ```bash
-chmod +x FileWayfinder-*.AppImage
-./FileWayfinder-*.AppImage
+chmod +x IconicFiler-*.AppImage
+./IconicFiler-*.AppImage
 ```
 
 ### Run from source
@@ -75,7 +75,7 @@ chmod +x FileWayfinder-*.AppImage
 pip install -r requirements.txt
 
 # 2. Run
-python -m file_wayfinder
+python -m iconic_filer
 
 # First launch opens a Setup Wizard where you pick
 # folders to monitor and their destination folders.
@@ -107,7 +107,7 @@ Tag pushes (`v*`) trigger the **Release** workflow which creates a GitHub Releas
 
 ## Configuration
 
-Config is stored in `~/.file-wayfinder/config.json`. Example:
+Config is stored in `~/.iconic-filer/config.json`. Example:
 
 ```json
 {
@@ -153,7 +153,7 @@ Config is stored in `~/.file-wayfinder/config.json`. Example:
 ## Architecture
 
 ```
-src/file_wayfinder/
+src/iconic_filer/
 ├── __main__.py       # CLI entry point
 ├── app.py            # Main orchestrator
 ├── watcher.py        # File system monitoring (watchdog)
@@ -185,7 +185,7 @@ pip install -e .
 pytest
 
 # Run with debug logging
-python -m file_wayfinder -v
+python -m iconic_filer -v
 
 # Lint
 ruff check src/ tests/
@@ -244,7 +244,7 @@ MIT
 A: Check three things: (1) the file name may match a pattern in **Settings → Rules → Whitelist** or the per-folder whitelist for that folder; (2) the file landed inside a configured *destination* folder, which is always skipped to prevent re-sorting already-sorted files; (3) the file name matches an ignore pattern in **Settings → Rules → Ignore Patterns** (e.g. `~$*` for Office temp files).
 
 **Q: The app stopped watching a folder.**  
-A: The folder may have been removed or unmounted. File Wayfinder logs a warning at startup when a monitored folder no longer exists. Re-add it in **Settings → Folders → + Watch** or via **Tray → Add folder to watch...** and the watcher will resume.
+A: The folder may have been removed or unmounted. Iconic Filer logs a warning at startup when a monitored folder no longer exists. Re-add it in **Settings → Folders → + Watch** or via **Tray → Add folder to watch...** and the watcher will resume.
 
 **Q: How do I undo a move?**  
 A: You have two options. From the tray: click **Undo last** to reverse the most recent action. From the dashboard: open **Tray → Dashboard**, select any action in the history list, then click **Undo to selected** to roll back all actions up to and including the selected one.

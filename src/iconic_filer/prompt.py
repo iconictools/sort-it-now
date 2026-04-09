@@ -1,4 +1,4 @@
-"""User prompt dialogs for File Wayfinder (customtkinter-based)."""
+"""User prompt dialogs for Iconic Filer (customtkinter-based)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 import customtkinter as ctk
 
-from file_wayfinder.themes import apply_ctk_appearance, get_theme
+from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ class SortPrompt:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("File Wayfinder")
+        root.title("Iconic Filer")
         root.attributes("-topmost", True)
         root.resizable(True, False)
 
@@ -573,7 +573,7 @@ class SetupWizard:
 
         root = ctk.CTk()
         self._root = root
-        root.title("File Wayfinder — Setup")
+        root.title("Iconic Filer — Setup")
         root.resizable(False, False)
 
         w, h = 560, 520
@@ -583,7 +583,7 @@ class SetupWizard:
 
         ctk.CTkLabel(
             root,
-            text="🗂 File Wayfinder — Setup",
+            text="🗂 Iconic Filer — Setup",
             font=_font(18, "bold"),
             text_color=t["accent"],
         ).pack(pady=(24, 4))
@@ -697,7 +697,7 @@ def cli_setup() -> dict[str, list[str]]:
 
     Returns ``{folder: [destinations]}`` or empty dict if cancelled.
     """
-    print("\n=== File Wayfinder -- CLI Setup ===\n")
+    print("\n=== Iconic Filer -- CLI Setup ===\n")
     folders: dict[str, list[str]] = {}
 
     while True:

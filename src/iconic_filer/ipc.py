@@ -1,4 +1,4 @@
-"""Simple socket-based IPC for File Wayfinder multi-instance support.
+"""Simple socket-based IPC for Iconic Filer multi-instance support.
 
 Protocol
 --------
@@ -22,7 +22,7 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
-IPC_PORT = 47890  # File Wayfinder IPC port (arbitrary, unregistered)
+IPC_PORT = 47890  # Iconic Filer IPC port (arbitrary, unregistered)
 IPC_HOST = "127.0.0.1"
 IPC_TIMEOUT = 1.0  # seconds
 

@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 
-from file_wayfinder.history import History
+from iconic_filer.history import History
 
 
 class TestHistory:
@@ -76,7 +76,7 @@ class TestHistory:
 
     def test_prune_keeps_max_actions(self):
         """History should prune to HISTORY_MAX_ACTIONS (Q7.3)."""
-        from file_wayfinder.constants import HISTORY_MAX_ACTIONS
+        from iconic_filer.constants import HISTORY_MAX_ACTIONS
 
         hist = History(self._db_path)
         for i in range(HISTORY_MAX_ACTIONS + 50):

@@ -1,4 +1,4 @@
-# File Wayfinder — Project Analysis & Design Questionnaire
+# Iconic Filer — Project Analysis & Design Questionnaire
 
 > **Purpose:** This document rates the current state of the project and asks
 > you (the project owner) about every unaddressed decision and improvement
@@ -43,7 +43,7 @@ Fill in each **→ Answer:** to guide the next development iteration.
 → Answer: **(e)** Windows and Linux
 
 **Q1.3** Should the app be distributable via a package manager?
-(a) PyPI (`pip install file-wayfinder`)  (b) Homebrew / Chocolatey / Snap  (c) Standalone binary only  (d) Not important yet
+(a) PyPI (`pip install iconic-filer`)  (b) Homebrew / Chocolatey / Snap  (c) Standalone binary only  (d) Not important yet
 
 → Answer: **(c)** Standalone binary only
 
@@ -293,7 +293,7 @@ Rate each feature: **H**igh / **M**edium / **L**ow / **N**o (don't want it).
 
 ---
 
-## 🧭 File Wayfinder — Direction Questionnaire (Round 2)
+## 🧭 Iconic Filer — Direction Questionnaire (Round 2)
 
 > Now that the core features are built, here are the roadblocks, ideas, and
 > questions I need your direction on. Reply inline or via PR comments.
@@ -314,18 +314,18 @@ rewrite of the UI layer but would eliminate all possible tkinter crashes.
 → **Answer:** Keep the current background-thread approach (works reliably on Windows and Linux, the supported platforms). A full `root.after()` refactor is deferred.
 
 **Context:** The config directory changed from `~/.sort-it-now/` to
-`~/.file-wayfinder/`. Existing users would lose their config, rules,
+`~/.iconic-filer/`. Existing users would lose their config, rules,
 and history.
 
 **Question:** Should I add an auto-migration that copies files from
-`~/.sort-it-now/` to `~/.file-wayfinder/` on first run if the old
+`~/.sort-it-now/` to `~/.iconic-filer/` on first run if the old
 directory exists? Or start fresh?
 
 (a) Auto-migrate old config on first run
 (b) Start fresh — no migration
 (c) Prompt the user to choose
 
-→ **Answer:** **(a)** Auto-migrate on first run. If `~/.sort-it-now/config.json` exists and `~/.file-wayfinder/config.json` does not, copy the old directory to the new one silently and log it.
+→ **Answer:** **(a)** Auto-migrate on first run. If `~/.sort-it-now/config.json` exists and `~/.iconic-filer/config.json` does not, copy the old directory to the new one silently and log it.
 
 ---
 
@@ -425,10 +425,10 @@ most-used destinations, average files per day.
 
 ---
 
-### D9. File Wayfinder Icon & Branding
+### D9. Iconic Filer Icon & Branding
 
 **Context:** The tray icon is currently a simple programmatically-drawn
-blue folder shape. With the rename to File Wayfinder, we could design
+blue folder shape. With the rename to Iconic Filer, we could design
 a proper icon.
 
 **Question:** Should I:
@@ -469,7 +469,7 @@ undo the rename.
 - [ ] Cloud sync of config/rules (e.g. via Google Drive or Dropbox folder)
 - [ ] Plugins/extensions API for custom sort logic
 - [ ] File type learning from content (not just extension)
-- [ ] Right-click context menu integration ("Sort with File Wayfinder")
+- [ ] Right-click context menu integration ("Sort with Iconic Filer")
 - [ ] Batch rename tool (separate from sort, just for renaming files)
 
 → **Ratings:**

@@ -1,9 +1,9 @@
-"""Entry point for File Wayfinder.
+"""Entry point for Iconic Filer.
 
 Usage:
-    python -m file_wayfinder          # Run the app (GUI)
-    python -m file_wayfinder --help   # Show help
-    python -m file_wayfinder --setup-cli  # CLI setup wizard
+    python -m iconic_filer          # Run the app (GUI)
+    python -m iconic_filer --help   # Show help
+    python -m iconic_filer --setup-cli  # CLI setup wizard
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ import logging.handlers  # noqa: E402
 import os  # noqa: E402
 import shutil  # noqa: E402
 
-from file_wayfinder import __version__  # noqa: E402
-from file_wayfinder.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE  # noqa: E402
+from iconic_filer import __version__  # noqa: E402
+from iconic_filer.constants import DEFAULT_CONFIG_DIR, DEFAULT_LOG_FILE  # noqa: E402
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -57,7 +57,7 @@ def _setup_logging(verbose: bool) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        prog="file-wayfinder",
+        prog="iconic-filer",
         description="Tray-resident real-time file organizer assistant.",
     )
     parser.add_argument(
@@ -97,14 +97,14 @@ def main(argv: list[str] | None = None) -> None:
                 "Could not migrate old config: %s", _exc
             )
 
-    from file_wayfinder.config import Config
-    from file_wayfinder.app import App
+    from iconic_filer.config import Config
+    from iconic_filer.app import App
 
     config = Config(args.config)
 
     # CLI setup mode (Q2.1c)
     if args.setup_cli:
-        from file_wayfinder.prompt import cli_setup
+        from iconic_filer.prompt import cli_setup
 
         folders = cli_setup()
         for folder, dests in folders.items():
@@ -114,13 +114,13 @@ def main(argv: list[str] | None = None) -> None:
 
     # ── Apply customtkinter appearance early ─────────────────────────
     try:
-        from file_wayfinder.themes import apply_ctk_appearance
+        from iconic_filer.themes import apply_ctk_appearance
         apply_ctk_appearance(config.get_setting("theme", "dark"))
     except Exception:
         pass
 
     # ── Multi-instance handling ──────────────────────────────────────
-    from file_wayfinder.ipc import is_running, send_command
+    from iconic_filer.ipc import is_running, send_command
 
     if is_running():
         behavior = config.get_setting("multi_instance_behavior", "prompt")
@@ -139,7 +139,7 @@ def main(argv: list[str] | None = None) -> None:
                 _root = tk.Tk()
                 _root.withdraw()
                 merge = messagebox.askyesno(
-                    "File Wayfinder is already running",
+                    "Iconic Filer is already running",
                     "Another instance is already running.\n\n"
                     "Do you want to add a new folder to the running instance?\n\n"
                     "(Choose No to open a separate, independent instance.)",
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> None:
                 _root = tk.Tk()
                 _root.withdraw()
                 folder = filedialog.askdirectory(
-                    title="Choose a folder for the running File Wayfinder to watch"
+                    title="Choose a folder for the running Iconic Filer to watch"
                 )
                 _root.destroy()
                 if folder:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local build script for File Wayfinder.
+"""Local build script for Iconic Filer.
 
 Creates a standalone executable using PyInstaller, and optionally packages it
 as a Linux AppImage.
@@ -23,16 +23,16 @@ import sys
 # Path to icon assets relative to this script
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _ASSETS_DIR = os.path.join(_SCRIPT_DIR, "assets")
-_ICON_PNG = os.path.join(_ASSETS_DIR, "file-wayfinder.png")
-_ICON_ICO = os.path.join(_ASSETS_DIR, "file-wayfinder.ico")
-_ICON_512 = os.path.join(_ASSETS_DIR, "file-wayfinder-512.png")
+_ICON_PNG = os.path.join(_ASSETS_DIR, "iconic-filer.png")
+_ICON_ICO = os.path.join(_ASSETS_DIR, "iconic-filer.ico")
+_ICON_512 = os.path.join(_ASSETS_DIR, "iconic-filer-512.png")
 
 
 def _pyinstaller_cmd(onefile: bool) -> list[str]:
     """Build the base PyInstaller command for the current platform."""
     cmd = [
         sys.executable, "-m", "PyInstaller",
-        "--name=file-wayfinder",
+        "--name=iconic-filer",
         "--windowed",
         "--noconfirm",
         "--clean",
@@ -52,7 +52,7 @@ def _pyinstaller_cmd(onefile: bool) -> list[str]:
     if onefile:
         cmd.append("--onefile")
 
-    cmd.append(os.path.join(_SCRIPT_DIR, "src", "file_wayfinder", "__main__.py"))
+    cmd.append(os.path.join(_SCRIPT_DIR, "src", "iconic_filer", "__main__.py"))
     return cmd
 
 
@@ -65,7 +65,7 @@ def _build_appimage(dist_dir: str) -> None:
         print("AppImage packaging is only supported on Linux.")
         sys.exit(1)
 
-    binary_dir = os.path.join(dist_dir, "file-wayfinder")
+    binary_dir = os.path.join(dist_dir, "iconic-filer")
     if not os.path.isdir(binary_dir):
         print(
             f"Directory bundle not found at {binary_dir!r}. "
@@ -79,7 +79,7 @@ def _build_appimage(dist_dir: str) -> None:
 
     # Copy the onedir bundle into AppDir/usr/bin/
     import shutil
-    bundle_dest = os.path.join(usr_bin, "file-wayfinder")
+    bundle_dest = os.path.join(usr_bin, "iconic-filer")
     if os.path.exists(bundle_dest):
         shutil.rmtree(bundle_dest)
     shutil.copytree(binary_dir, bundle_dest)
@@ -90,18 +90,18 @@ def _build_appimage(dist_dir: str) -> None:
         fh.write(
             '#!/bin/bash\n'
             'HERE="$(dirname "$(readlink -f "${0}")")"\n'
-            'exec "${HERE}/usr/bin/file-wayfinder/file-wayfinder" "$@"\n'
+            'exec "${HERE}/usr/bin/iconic-filer/iconic-filer" "$@"\n'
         )
     os.chmod(apprun_path, 0o755)
 
     # .desktop file (AppImage spec requires one at the root of AppDir)
-    desktop_path = os.path.join(app_dir, "file-wayfinder.desktop")
+    desktop_path = os.path.join(app_dir, "iconic-filer.desktop")
     with open(desktop_path, "w", encoding="utf-8") as fh:
         fh.write(
             "[Desktop Entry]\n"
-            "Name=File Wayfinder\n"
-            "Exec=file-wayfinder\n"
-            "Icon=file-wayfinder\n"
+            "Name=Iconic Filer\n"
+            "Exec=iconic-filer\n"
+            "Icon=iconic-filer\n"
             "Type=Application\n"
             "Categories=Utility;FileManager;\n"
             "Comment=Real-time file organizer assistant\n"
@@ -109,7 +109,7 @@ def _build_appimage(dist_dir: str) -> None:
         )
 
     # Copy icon to AppDir root (AppImage spec: <Name>.png at root)
-    icon_dst = os.path.join(app_dir, "file-wayfinder.png")
+    icon_dst = os.path.join(app_dir, "iconic-filer.png")
     if os.path.isfile(_ICON_PNG):
         shutil.copy2(_ICON_PNG, icon_dst)
     else:
@@ -132,7 +132,7 @@ def _build_appimage(dist_dir: str) -> None:
         )
         sys.exit(1)
 
-    out_appimage = os.path.join(dist_dir, "FileWayfinder-x86_64.AppImage")
+    out_appimage = os.path.join(dist_dir, "IconicFiler-x86_64.AppImage")
     env = dict(os.environ, ARCH="x86_64")
     subprocess.check_call(
         [appimagetool, app_dir, out_appimage],
@@ -161,7 +161,7 @@ def _find_appimagetool() -> str | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build File Wayfinder executable")
+    parser = argparse.ArgumentParser(description="Build Iconic Filer executable")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--onefile",

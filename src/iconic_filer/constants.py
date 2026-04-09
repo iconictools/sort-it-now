@@ -1,4 +1,4 @@
-"""Constants and default settings for File Wayfinder."""
+"""Constants and default settings for Iconic Filer."""
 
 from __future__ import annotations
 
@@ -122,11 +122,11 @@ FILE_STABLE_CHECK_INTERVAL = 1.0
 FILE_STILL_DOWNLOADING_WINDOW_SECONDS = 60
 
 # Default config file location
-DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".file-wayfinder")
+DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".iconic-filer")
 DEFAULT_CONFIG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "config.json")
 DEFAULT_HISTORY_DB = os.path.join(DEFAULT_CONFIG_DIR, "history.db")
 DEFAULT_RULES_FILE = os.path.join(DEFAULT_CONFIG_DIR, "rules.json")
-DEFAULT_LOG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "file-wayfinder.log")
+DEFAULT_LOG_FILE = os.path.join(DEFAULT_CONFIG_DIR, "iconic-filer.log")
 DEFAULT_UNSORTED_DIR = os.path.join(DEFAULT_CONFIG_DIR, "unsorted")
 
 # Maximum number of actions to keep in history

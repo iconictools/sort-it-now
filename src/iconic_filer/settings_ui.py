@@ -1,4 +1,4 @@
-"""Settings dialog for File Wayfinder (customtkinter-based).
+"""Settings dialog for Iconic Filer (customtkinter-based).
 
 Layout (tabbed):
   Tab 1 — General     : theme, notifications, undo restore-name, multi-instance
@@ -18,11 +18,11 @@ from typing import TYPE_CHECKING, Any
 
 import customtkinter as ctk
 
-from file_wayfinder.autostart import is_autostart_enabled, set_autostart
-from file_wayfinder.themes import apply_ctk_appearance, get_theme
+from iconic_filer.autostart import is_autostart_enabled, set_autostart
+from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
-    from file_wayfinder.config import Config
+    from iconic_filer.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -667,7 +667,7 @@ def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk
         if path:
             cfg.import_config(path)
             messagebox.showinfo(
-                "Import", "Config imported. Restart File Wayfinder to apply.", parent=root
+                "Import", "Config imported. Restart Iconic Filer to apply.", parent=root
             )
 
     _btn(io_frame, "Export Config…", t, _export, "normal").pack(side="left", padx=(0, 6))
@@ -697,7 +697,7 @@ class SettingsDialog:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("File Wayfinder — Settings")
+        root.title("Iconic Filer — Settings")
         root.resizable(True, True)
         root.minsize(560, 560)
 

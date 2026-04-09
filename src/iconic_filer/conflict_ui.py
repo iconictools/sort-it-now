@@ -1,4 +1,4 @@
-"""Conflict resolution UI for File Wayfinder.
+"""Conflict resolution UI for Iconic Filer.
 
 When a file already exists at the destination, presents the user with
 options to overwrite, rename, or skip.
@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
-from file_wayfinder.themes import apply_ctk_appearance, get_theme
+from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
-    from file_wayfinder.config import Config
+    from iconic_filer.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def resolve_conflict(
     result: list[str | None] = [None]
 
     root = ctk.CTk()
-    root.title("File Wayfinder — File Conflict")
+    root.title("Iconic Filer — File Conflict")
     root.attributes("-topmost", True)
     root.resizable(False, False)
 

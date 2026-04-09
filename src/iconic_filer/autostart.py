@@ -1,4 +1,4 @@
-"""Autostart on login management for File Wayfinder.
+"""Autostart on login management for Iconic Filer.
 
 On Windows this uses the ``HKCU\\...\\Run`` registry key.
 On Linux this creates/removes a ``.desktop`` file in
@@ -16,9 +16,9 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-_APP_NAME = "FileWayfinder"
-_DESKTOP_FILENAME = "file-wayfinder.desktop"
-_MACOS_PLIST_FILENAME = "com.file-wayfinder.plist"
+_APP_NAME = "IconicFiler"
+_DESKTOP_FILENAME = "iconic-filer.desktop"
+_MACOS_PLIST_FILENAME = "com.iconic-filer.plist"
 
 
 def _linux_desktop_path() -> str:
@@ -34,7 +34,7 @@ def _frozen_or_module_cmd() -> str:
     """Return the shell command used to launch the app on this platform."""
     if getattr(sys, "frozen", False):
         return sys.executable
-    return f"{sys.executable} -m file_wayfinder"
+    return f"{sys.executable} -m iconic_filer"
 
 
 def _linux_exec_cmd() -> str:
@@ -104,7 +104,7 @@ def set_autostart(enabled: bool) -> bool:
                     if getattr(sys, "frozen", False):
                         exe = sys.executable
                     else:
-                        exe = f'"{sys.executable}" -m file_wayfinder'
+                        exe = f'"{sys.executable}" -m iconic_filer'
                     winreg.SetValueEx(key, _APP_NAME, 0, winreg.REG_SZ, exe)
                     logger.info("Autostart enabled (Windows registry).")
                 else:
@@ -164,7 +164,7 @@ def set_autostart(enabled: bool) -> bool:
                     '<plist version="1.0">\n'
                     "<dict>\n"
                     "    <key>Label</key>\n"
-                    f"    <string>com.file-wayfinder</string>\n"
+                    f"    <string>com.iconic-filer</string>\n"
                     "    <key>ProgramArguments</key>\n"
                     "    <array>\n"
                     f"{program_args}"

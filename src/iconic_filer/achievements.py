@@ -1,4 +1,4 @@
-"""Achievement system for File Wayfinder."""
+"""Achievement system for Iconic Filer."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from file_wayfinder.history import History
+    from iconic_filer.history import History
 
 logger = logging.getLogger(__name__)
 

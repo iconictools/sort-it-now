@@ -1,4 +1,4 @@
-"""Extracted dashboard and batch-list windows for File Wayfinder."""
+"""Extracted dashboard and batch-list windows for Iconic Filer."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any, Callable
 
 import customtkinter as ctk
 
-from file_wayfinder.themes import apply_ctk_appearance, get_theme
+from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def show_dashboard(
     apply_ctk_appearance(theme_name)
 
     root = ctk.CTk()
-    root.title("File Wayfinder — Dashboard")
+    root.title("Iconic Filer — Dashboard")
     root.geometry("600x680")
 
     # ── Header ────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ def show_dashboard(
 
     # ── Achievements ──────────────────────────────────────────────────
     try:
-        from file_wayfinder.achievements import Achievements
+        from iconic_filer.achievements import Achievements
 
         ach_db = os.path.join(os.path.dirname(config.path), "achievements.db")
         achs = Achievements(ach_db)
@@ -220,7 +220,7 @@ def show_dashboard(
     # ── Rules summary ─────────────────────────────────────────────────
     rules_count = 0
     try:
-        from file_wayfinder.rules import Rules
+        from iconic_filer.rules import Rules
 
         rules_path = os.path.join(os.path.dirname(config.path), "rules.json")
         if os.path.exists(rules_path):
@@ -325,7 +325,7 @@ def show_batch_list(
     apply_ctk_appearance(theme_name)
 
     root = ctk.CTk()
-    root.title("File Wayfinder — Batch Processing")
+    root.title("Iconic Filer — Batch Processing")
     root.geometry("640x480")
 
     ctk.CTkLabel(

@@ -1,4 +1,4 @@
-"""Theme management for File Wayfinder.
+"""Theme management for Iconic Filer.
 
 Supports dark and light themes for all tkinter / customtkinter windows.
 """

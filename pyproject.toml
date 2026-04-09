@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "file-wayfinder"
+name = "iconic-filer"
 version = "0.1.0"
-description = "Tray-resident real-time file organizer assistant"
+description = "Tray-resident real-time file organizer by Iconic Tools"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
@@ -25,7 +25,7 @@ dev = [
 ]
 
 [project.scripts]
-file-wayfinder = "file_wayfinder.__main__:main"
+iconic-filer = "iconic_filer.__main__:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

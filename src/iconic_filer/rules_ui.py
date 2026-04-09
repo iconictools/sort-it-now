@@ -1,4 +1,4 @@
-"""Rule management UI for File Wayfinder (customtkinter-based).
+"""Rule management UI for Iconic Filer (customtkinter-based).
 
 Lets the user view, add, edit, and delete auto-sort rules through a
 card-based interface that matches the main prompt design.
@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import customtkinter as ctk
 
-from file_wayfinder.themes import apply_ctk_appearance, get_theme
+from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
-    from file_wayfinder.config import Config
-    from file_wayfinder.rules import Rules
+    from iconic_filer.config import Config
+    from iconic_filer.rules import Rules
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class RulesDialog:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("File Wayfinder — Rules")
+        root.title("Iconic Filer — Rules")
         root.resizable(True, True)
 
         w, h = 580, 680

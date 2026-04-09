@@ -1,4 +1,4 @@
-"""Main application orchestrator for File Wayfinder."""
+"""Main application orchestrator for Iconic Filer."""
 
 from __future__ import annotations
 
@@ -10,22 +10,22 @@ import shutil
 import sys
 import threading
 
-from file_wayfinder.achievements import Achievements
-from file_wayfinder.classifier import suggest_destinations
-from file_wayfinder.config import Config
-from file_wayfinder.conflict_ui import resolve_conflict
-from file_wayfinder.constants import DEFAULT_UNSORTED_DIR
-from file_wayfinder.dashboard_ui import show_batch_list, show_dashboard
-from file_wayfinder.duplicate import find_duplicate
-from file_wayfinder.history import History
-from file_wayfinder.ipc import IPCServer
-from file_wayfinder.notifications import notify
-from file_wayfinder.prompt import SortPrompt, SetupWizard
-from file_wayfinder.rules import Rules
-from file_wayfinder.rules_ui import RulesDialog
-from file_wayfinder.settings_ui import SettingsDialog
-from file_wayfinder.tray import TrayIcon
-from file_wayfinder.watcher import FolderWatcher
+from iconic_filer.achievements import Achievements
+from iconic_filer.classifier import suggest_destinations
+from iconic_filer.config import Config
+from iconic_filer.conflict_ui import resolve_conflict
+from iconic_filer.constants import DEFAULT_UNSORTED_DIR
+from iconic_filer.dashboard_ui import show_batch_list, show_dashboard
+from iconic_filer.duplicate import find_duplicate
+from iconic_filer.history import History
+from iconic_filer.ipc import IPCServer
+from iconic_filer.notifications import notify
+from iconic_filer.prompt import SortPrompt, SetupWizard
+from iconic_filer.rules import Rules
+from iconic_filer.rules_ui import RulesDialog
+from iconic_filer.settings_ui import SettingsDialog
+from iconic_filer.tray import TrayIcon
+from iconic_filer.watcher import FolderWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +174,7 @@ class App:
                         folder, self._on_file_detected, whitelist,
                     )
 
-        logger.info("File Wayfinder is running.")
+        logger.info("Iconic Filer is running.")
         self._ipc_server.start()
         self._update_tray_monitored_count()
         # Start background cleanup-reminder polling thread
@@ -201,7 +201,7 @@ class App:
         self.tray.set_monitored_count(count)
 
     def _handle_ipc_command(self, command: str) -> None:
-        """Handle a command sent by another File Wayfinder instance via IPC.
+        """Handle a command sent by another Iconic Filer instance via IPC.
 
         Currently supported commands:
         ``ADD_FOLDER:<abs_path>`` — start watching the given folder, inheriting

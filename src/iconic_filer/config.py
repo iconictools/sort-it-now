@@ -1,4 +1,4 @@
-"""Configuration management for File Wayfinder.
+"""Configuration management for Iconic Filer.
 
 Stores monitored folders, destination sets, and user preferences as JSON.
 
@@ -26,7 +26,7 @@ import time
 import zipfile
 from typing import Any
 
-from file_wayfinder.constants import DEFAULT_CONFIG_FILE
+from iconic_filer.constants import DEFAULT_CONFIG_FILE
 
 logger = logging.getLogger(__name__)
 
