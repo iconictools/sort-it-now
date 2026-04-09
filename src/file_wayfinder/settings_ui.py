@@ -239,7 +239,7 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
 
     _lbl(f, "Auto-create rule after N manual same-ext sorts (0=off):", t).grid(
         row=row, column=0, sticky="w", padx=8, pady=3)
-    learn_var = tk.IntVar(value=cfg.get_setting("auto_learn_threshold", 3))
+    learn_var = tk.IntVar(value=cfg.get_setting("auto_learn_threshold", 0))
     ctk.CTkEntry(f, textvariable=learn_var, width=80,
                  font=ctk.CTkFont(size=10), border_color=t["accent"]).grid(
         row=row, column=1, sticky="w", padx=(0, 8), pady=3)
