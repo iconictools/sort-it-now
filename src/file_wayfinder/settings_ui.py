@@ -92,6 +92,31 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
                                                        padx=(0, 8), pady=3)
     row += 1
 
+    _section_lbl(f, "Sort Prompt Behaviour", t).grid(row=row, column=0, columnspan=2,
+                                                      sticky="w", padx=8, pady=(12, 4))
+    row += 1
+    _lbl(f, 'Pre-check "Always send .ext here":', t).grid(row=row, column=0, sticky="w",
+                                                           padx=8, pady=3)
+    always_rule_var = tk.BooleanVar(value=cfg.get_setting("prompt_always_rule", True))
+    _check(f, "Enabled", always_rule_var, t).grid(row=row, column=1, sticky="w",
+                                                    padx=(0, 8), pady=3)
+    row += 1
+
+    _lbl(f, "Auto-accept top suggestion after (s, 0=off):", t).grid(row=row, column=0,
+                                                                      sticky="w", padx=8, pady=3)
+    auto_accept_var = tk.IntVar(value=cfg.get_setting("prompt_auto_accept_seconds", 0))
+    ctk.CTkEntry(f, textvariable=auto_accept_var, width=80,
+                 font=ctk.CTkFont(size=10), border_color=t["accent"]).grid(
+        row=row, column=1, sticky="w", padx=(0, 8), pady=3)
+    row += 1
+
+    _lbl(f, "Snooze duration (minutes):", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
+    snooze_var = tk.IntVar(value=cfg.get_setting("snooze_minutes", 30))
+    ctk.CTkEntry(f, textvariable=snooze_var, width=80,
+                 font=ctk.CTkFont(size=10), border_color=t["accent"]).grid(
+        row=row, column=1, sticky="w", padx=(0, 8), pady=3)
+    row += 1
+
     _section_lbl(f, "Notifications", t).grid(row=row, column=0, columnspan=2, sticky="w",
                                               padx=8, pady=(12, 4))
     row += 1
@@ -131,6 +156,9 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
     f.grid_columnconfigure(1, weight=1)
     return {
         "theme": theme_var,
+        "prompt_always_rule": always_rule_var,
+        "prompt_auto_accept_seconds": auto_accept_var,
+        "snooze_minutes": snooze_var,
         "native_notifications": notif_var,
         "notification_fallback": fallback_var,
         "undo_restore_name": undo_name_var,
@@ -195,6 +223,28 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
         row=row, column=1, sticky="w", padx=(0, 8), pady=3)
     row += 1
 
+    _section_lbl(f, "File Conflicts & Auto-Learning", t).grid(
+        row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(12, 4))
+    row += 1
+
+    _lbl(f, "When a file already exists at destination:", t).grid(
+        row=row, column=0, sticky="w", padx=8, pady=3)
+    conflict_var = tk.StringVar(value=cfg.get_setting("conflict_resolution", "rename"))
+    ctk.CTkOptionMenu(
+        f, variable=conflict_var,
+        values=["rename", "ask", "overwrite", "skip"],
+        font=ctk.CTkFont(size=10),
+    ).grid(row=row, column=1, sticky="ew", padx=(0, 8), pady=3)
+    row += 1
+
+    _lbl(f, "Auto-create rule after N manual same-ext sorts (0=off):", t).grid(
+        row=row, column=0, sticky="w", padx=8, pady=3)
+    learn_var = tk.IntVar(value=cfg.get_setting("auto_learn_threshold", 3))
+    ctk.CTkEntry(f, textvariable=learn_var, width=80,
+                 font=ctk.CTkFont(size=10), border_color=t["accent"]).grid(
+        row=row, column=1, sticky="w", padx=(0, 8), pady=3)
+    row += 1
+
     f.grid_columnconfigure(1, weight=1)
     return {
         "prompt_delay_seconds": delay_var,
@@ -204,6 +254,8 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
         "pattern_rules_enabled": pattern_var,
         "duplicate_detection": dup_var,
         "cleanup_reminder_threshold": cleanup_var,
+        "conflict_resolution": conflict_var,
+        "auto_learn_threshold": learn_var,
     }
 
 

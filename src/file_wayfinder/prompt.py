@@ -34,6 +34,10 @@ class SortPrompt:
         on_whitelist: Callable[[str], None] | None = None,
         on_quick_add: Callable[[str], None] | None = None,
         history: Any = None,
+        on_snooze: Callable[[], None] | None = None,
+        on_save_destination: Callable[[str], None] | None = None,
+        always_rule_default: bool = True,
+        auto_accept_seconds: int = 0,
     ) -> None:
         """
         Parameters
@@ -53,6 +57,16 @@ class SortPrompt:
             (only shown when the detected item is a directory).
         history:
             Optional History instance used for "Same as last time" suggestion.
+        on_snooze:
+            Called when the user clicks "Later" to defer the prompt.
+        on_save_destination:
+            Called with a folder path when the user picks a new destination
+            and confirms they want it saved as a permanent destination.
+        always_rule_default:
+            Whether the "Always send .ext files here" checkbox is pre-checked.
+        auto_accept_seconds:
+            If > 0, automatically pick the top suggestion after this many
+            seconds (user can cancel by pressing Escape or clicking elsewhere).
         """
         self._filepath = filepath
         self._destinations = destinations
@@ -62,6 +76,10 @@ class SortPrompt:
         self._on_whitelist = on_whitelist
         self._on_quick_add = on_quick_add
         self._history = history
+        self._on_snooze = on_snooze
+        self._on_save_destination = on_save_destination
+        self._always_rule_default = always_rule_default
+        self._auto_accept_seconds = auto_accept_seconds
 
     def show(self) -> None:
         """Display the prompt (blocks until user responds)."""
@@ -216,6 +234,9 @@ class SortPrompt:
         scroll_frame.pack(fill="x", padx=24, pady=8)
 
         chosen: list[str | None] = [None]
+        # Ordered list of destinations as they appear in the button list,
+        # used for keyboard-shortcut selection (keys 1-9).
+        _key_dests: list[str] = []
 
         def _choose(dest: str) -> None:
             chosen[0] = dest
@@ -231,6 +252,7 @@ class SortPrompt:
         if last_dest is not None and os.path.isdir(last_dest) and last_dest in self._destinations:
             dest_name = os.path.basename(last_dest)
             _ld: str = last_dest
+            _key_dests.append(_ld)
             ctk.CTkButton(
                 scroll_frame,
                 text=f"↑ Same as last ({dest_name})",
@@ -243,6 +265,8 @@ class SortPrompt:
             ).pack(fill="x", pady=(0, 6))
 
         for dest in self._destinations:
+            if dest not in _key_dests:
+                _key_dests.append(dest)
             label = os.path.basename(dest) if os.path.sep in dest else dest
             ctk.CTkButton(
                 scroll_frame,
@@ -260,8 +284,21 @@ class SortPrompt:
             folder = filedialog.askdirectory(
                 title="Choose new destination folder"
             )
-            if folder:
-                _choose(folder)
+            if not folder:
+                return
+            # Offer to save as a permanent destination for this watched folder
+            if self._on_save_destination is not None:
+                from tkinter import messagebox as _mb
+                save_it = _mb.askyesno(
+                    "Save destination?",
+                    f"Add '{os.path.basename(folder)}' as a permanent "
+                    "destination?\n\nIt will then appear in the list for "
+                    "future files.",
+                    parent=root,
+                )
+                if save_it:
+                    self._on_save_destination(folder)
+            _choose(folder)
 
         ctk.CTkButton(
             scroll_frame,
@@ -275,7 +312,7 @@ class SortPrompt:
         ).pack(fill="x", pady=(8, 2))
 
         # ── Always checkbox ────────────────────────────────────────────
-        always_var = tk.BooleanVar(value=False)
+        always_var = tk.BooleanVar(value=self._always_rule_default)
         _, ext = os.path.splitext(self._filepath)
         ctk.CTkCheckBox(
             root,
@@ -286,12 +323,47 @@ class SortPrompt:
             hover_color=t["btn_active"],
         ).pack(pady=(4, 4))
 
+        # ── Auto-accept countdown ──────────────────────────────────────
+        # If enabled and there is at least one suggestion, show a countdown
+        # that automatically picks the top destination.
+        _countdown_label: ctk.CTkLabel | None = None
+        if self._auto_accept_seconds > 0 and _key_dests:
+            _auto_dest = _key_dests[0]
+            _remaining = [self._auto_accept_seconds]
+
+            _countdown_label = ctk.CTkLabel(
+                root,
+                text=f"Auto-sorting in {_remaining[0]}s… press Escape to cancel",
+                font=_font(9),
+                text_color=t["muted"],
+            )
+            _countdown_label.pack(pady=(0, 2))
+
+            def _tick() -> None:
+                _remaining[0] -= 1
+                if _countdown_label is None:
+                    return
+                if _remaining[0] <= 0:
+                    if chosen[0] is None:
+                        _choose(_auto_dest)
+                    return
+                try:
+                    _countdown_label.configure(
+                        text=f"Auto-sorting in {_remaining[0]}s… press Escape to cancel"
+                    )
+                    root.after(1000, _tick)
+                except Exception:
+                    pass  # Window may have been destroyed
+
+            root.after(1000, _tick)
+
         # ── Bottom buttons ─────────────────────────────────────────────
         bottom_frame = ctk.CTkFrame(root, fg_color="transparent")
         bottom_frame.pack(pady=(0, 16))
 
         whitelisted = [False]
         quick_added = [False]
+        snoozed = [False]
 
         # Quick Add Folder button — only shown when the detected item is a directory
         if is_dir and self._on_quick_add is not None:
@@ -312,6 +384,26 @@ class SortPrompt:
                 font=_font(10, "bold"),
                 corner_radius=8,
                 command=_do_quick_add,
+            ).pack(side="left", padx=4)
+
+        # "⏰ Later" snooze button
+        if self._on_snooze is not None:
+            _snooze_cb = self._on_snooze
+
+            def _do_snooze() -> None:
+                snoozed[0] = True
+                root.destroy()
+                _snooze_cb()
+
+            ctk.CTkButton(
+                bottom_frame,
+                text="⏰ Later",
+                fg_color=t["btn_bg"],
+                text_color=t["btn_fg"],
+                hover_color=t["muted"],
+                font=_font(10),
+                corner_radius=8,
+                command=_do_snooze,
             ).pack(side="left", padx=4)
 
         # Add to whitelist button
@@ -346,10 +438,30 @@ class SortPrompt:
             command=root.destroy,
         ).pack(side="left", padx=4)
 
+        # ── Keyboard shortcuts ─────────────────────────────────────────
+        # 1-9: pick destination by position; Enter: pick first; Escape: ignore
+        def _on_key(event: Any) -> None:
+            key = event.keysym
+            if key == "Escape":
+                root.destroy()
+            elif key == "Return" and _key_dests:
+                _choose(_key_dests[0])
+            elif key.isdigit():
+                idx = int(key) - 1
+                if 0 <= idx < len(_key_dests):
+                    _choose(_key_dests[idx])
+
+        root.bind("<Key>", _on_key)
+        root.focus_force()
+
         root.mainloop()
 
         # If quick-added, the on_quick_add callback handled everything
         if quick_added[0]:
+            return
+
+        # If snoozed, the snooze callback handles re-queuing
+        if snoozed[0]:
             return
 
         # If whitelisted, skip callback — file stays in place
@@ -415,7 +527,28 @@ class SetupWizard:
         scroll_frame.pack(fill="x", padx=24, pady=4)
         scroll_frame.grid_columnconfigure(0, weight=1)
 
-        folders_data: dict[str, list[str]] = {}
+        # Pre-populate with common system folders if they exist.
+        def _detect_default_folders() -> dict[str, list[str]]:
+            home = os.path.expanduser("~")
+            monitored_candidates = [
+                os.path.join(home, "Downloads"),
+                os.path.join(home, "Desktop"),
+            ]
+            destination_candidates = [
+                os.path.join(home, "Documents"),
+                os.path.join(home, "Pictures"),
+                os.path.join(home, "Videos"),
+                os.path.join(home, "Music"),
+            ]
+            detected: dict[str, list[str]] = {}
+            for m in monitored_candidates:
+                if os.path.isdir(m):
+                    dests = [d for d in destination_candidates if os.path.isdir(d)]
+                    if dests:
+                        detected[m] = dests
+            return detected
+
+        folders_data: dict[str, list[str]] = _detect_default_folders()
         row_labels: list[ctk.CTkLabel] = []
 
         def _refresh_list() -> None:
@@ -454,6 +587,9 @@ class SetupWizard:
         def _done() -> None:
             self.result = folders_data
             root.destroy()
+
+        # Show pre-populated folders immediately
+        _refresh_list()
 
         btn_frame = ctk.CTkFrame(root, fg_color="transparent")
         btn_frame.pack(pady=16)

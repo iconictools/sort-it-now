@@ -28,9 +28,34 @@ def resolve_conflict(
 ) -> str | None:
     """Show a conflict dialog and return the resolved destination path.
 
-    Returns *None* if the user chooses to skip.  Otherwise returns the
+    The behaviour is controlled by the ``conflict_resolution`` setting:
+    - ``"rename"``    — silently rename the incoming file (adds `` (N)`` suffix)
+    - ``"overwrite"`` — silently overwrite the existing file
+    - ``"skip"``      — silently skip the move (returns *None*)
+    - ``"ask"``       — show an interactive dialog (original behaviour)
+
+    Returns *None* if the file should be skipped.  Otherwise returns the
     final destination path (possibly renamed).
     """
+    resolution = config.get_setting("conflict_resolution", "rename")
+
+    if resolution == "rename":
+        base, ext = os.path.splitext(os.path.basename(dst))
+        dest_dir = os.path.dirname(dst)
+        counter = 1
+        new_dst = os.path.join(dest_dir, f"{base} ({counter}){ext}")
+        while os.path.exists(new_dst):
+            counter += 1
+            new_dst = os.path.join(dest_dir, f"{base} ({counter}){ext}")
+        return new_dst
+
+    if resolution == "overwrite":
+        return dst
+
+    if resolution == "skip":
+        return None
+
+    # "ask" — fall through to the interactive dialog below.
     theme_name = config.get_setting("theme", "dark")
     t = get_theme(theme_name)
     apply_ctk_appearance(theme_name)
