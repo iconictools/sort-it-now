@@ -65,6 +65,7 @@ jobs:
         run: python build.py --appimage
         env:
           ARCH: x86_64
+          APPIMAGETOOL: ${{ github.workspace }}/appimagetool
 
       - name: Rename AppImage with version
         if: runner.os == 'Linux'
@@ -81,6 +82,25 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/
           retention-days: 30
+
+      - name: Upload diagnostics (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failure-diagnostics-${{ matrix.os }}
+          path: |
+            build/
+            dist/
+            AppDir/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Failure summary (on failure)
+        if: failure()
+        run: |
+          echo "### Release build failed on ${{ matrix.os }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact: ci-failure-diagnostics-${{ matrix.os }}" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     name: Create GitHub Release

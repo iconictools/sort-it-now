@@ -144,16 +144,23 @@ def _build_appimage(dist_dir: str) -> None:
 def _find_appimagetool() -> str | None:
     """Return the path to appimagetool if it exists, else None."""
     import shutil as _shutil
+    env_path = os.environ.get("APPIMAGETOOL")
+    if env_path:
+        env_path = os.path.abspath(env_path)
+        if os.path.isfile(env_path) and os.access(env_path, os.X_OK):
+            return env_path
+
     # Check common locations
     candidates = [
-        "appimagetool",
-        "appimagetool-x86_64.AppImage",
         os.path.join(_SCRIPT_DIR, "appimagetool"),
         os.path.join(_SCRIPT_DIR, "appimagetool-x86_64.AppImage"),
+        "appimagetool",
+        "appimagetool-x86_64.AppImage",
     ]
     for candidate in candidates:
+        absolute_candidate = os.path.abspath(candidate)
         found = _shutil.which(candidate) or (
-            os.path.isfile(candidate) and os.access(candidate, os.X_OK) and candidate
+            os.path.isfile(absolute_candidate) and os.access(absolute_candidate, os.X_OK) and absolute_candidate
         )
         if found:
             return found
