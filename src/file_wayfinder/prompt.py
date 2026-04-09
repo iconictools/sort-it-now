@@ -81,6 +81,81 @@ class SortPrompt:
         self._always_rule_default = always_rule_default
         self._auto_accept_seconds = auto_accept_seconds
 
+    # ── Card-button factory ────────────────────────────────────────────
+
+    @staticmethod
+    def _dest_card(
+        parent: Any,
+        idx: int,
+        dest: str,
+        is_last_used: bool,
+        t: dict,
+        on_click: Callable[[str], None],
+    ) -> None:
+        """Create a tall, card-style destination button inside *parent*.
+
+        The card shows the folder name prominently with the shortened path
+        underneath and a keyboard-shortcut number on the left.  Hover
+        changes the background to the accent colour on both Windows and Linux.
+        """
+        home = os.path.expanduser("~")
+        folder_name = os.path.basename(dest) or dest
+        short_path = dest.replace(home, "~") if dest.startswith(home) else dest
+
+        normal_color = t["success"] if is_last_used else t["btn_bg"]
+        hover_color = t["btn_active"] if is_last_used else t["accent"]
+        num_label = "↵" if is_last_used else str(idx + 1)
+
+        # Outer card frame
+        card = ctk.CTkFrame(parent, fg_color=normal_color, corner_radius=10)
+        card.pack(fill="x", pady=3)
+        card.grid_columnconfigure(1, weight=1)
+
+        # Number / shortcut badge
+        badge = ctk.CTkLabel(
+            card, text=num_label,
+            font=_font(11, "bold"),
+            text_color=t["muted"] if not is_last_used else "#1e1e2e",
+            width=32,
+        )
+        badge.grid(row=0, column=0, rowspan=2, padx=(12, 8), pady=10, sticky="ns")
+
+        # Folder name (primary)
+        name_lbl = ctk.CTkLabel(
+            card, text=f"📁  {folder_name}",
+            font=_font(13, "bold"),
+            text_color=t["btn_fg"] if not is_last_used else "#1e1e2e",
+            anchor="w",
+        )
+        name_lbl.grid(row=0, column=1, sticky="w", pady=(8, 0))
+
+        # Short path (secondary)
+        path_lbl = ctk.CTkLabel(
+            card, text=short_path,
+            font=_font(9),
+            text_color=t["muted"] if not is_last_used else "#3e3e5e",
+            anchor="w",
+        )
+        path_lbl.grid(row=1, column=1, sticky="w", pady=(0, 8))
+
+        # Hover effect + click binding on all child widgets
+        def _enter(_e: Any = None) -> None:
+            card.configure(fg_color=hover_color)
+
+        def _leave(_e: Any = None) -> None:
+            card.configure(fg_color=normal_color)
+
+        def _click(_e: Any = None) -> None:
+            on_click(dest)
+
+        for widget in (card, badge, name_lbl, path_lbl):
+            widget.bind("<Enter>", _enter)
+            widget.bind("<Leave>", _leave)
+            widget.bind("<Button-1>", _click)
+
+        # Make the frame expand on hover for keyboard-only users
+        card.configure(cursor="hand2")
+
     def show(self) -> None:
         """Display the prompt (blocks until user responds)."""
         t = get_theme(self._theme_name)
@@ -89,18 +164,14 @@ class SortPrompt:
         root = ctk.CTk()
         root.title("File Wayfinder")
         root.attributes("-topmost", True)
-        root.resizable(False, False)
-
-        # Center on screen
-        w, h = 460, 600
-        sx = root.winfo_screenwidth() // 2 - w // 2
-        sy = root.winfo_screenheight() // 2 - h // 2
-        root.geometry(f"{w}x{h}+{sx}+{sy}")
+        root.resizable(True, False)
 
         basename = os.path.basename(self._filepath)
         is_dir = os.path.isdir(self._filepath)
+        _, ext_lower = os.path.splitext(self._filepath)
+        ext_lower = ext_lower.lower()
 
-        # File size (skip for directories)
+        # ── File metadata ──────────────────────────────────────────────
         size_str = ""
         if not is_dir:
             try:
@@ -114,186 +185,127 @@ class SortPrompt:
             except OSError:
                 size_str = ""
 
+        _TYPE_LABELS: dict[str, str] = {
+            ".pdf": "📄", ".zip": "🗜", ".rar": "🗜", ".7z": "🗜",
+            ".doc": "📝", ".docx": "📝", ".xls": "📊", ".xlsx": "📊",
+            ".ppt": "📊", ".pptx": "📊", ".mp4": "🎬", ".mkv": "🎬",
+            ".avi": "🎬", ".mp3": "🎵", ".wav": "🎵", ".flac": "🎵",
+            ".jpg": "🖼", ".jpeg": "🖼", ".png": "🖼", ".gif": "🖼",
+            ".exe": "⚙", ".msi": "⚙", ".deb": "⚙", ".rpm": "⚙",
+            ".py": "🐍", ".js": "📜", ".ts": "📜", ".go": "📜",
+            ".txt": "📄", ".md": "📄", ".csv": "📊", ".json": "📄",
+        }
+        file_icon = "📁" if is_dir else _TYPE_LABELS.get(ext_lower, "🗂")
+
         # ── Header ────────────────────────────────────────────────────
-        header_text = "📁 New folder detected" if is_dir else "🗂 New file detected"
-        ctk.CTkLabel(
-            root,
-            text=header_text,
-            font=_font(16, "bold"),
-            text_color=t["accent"],
-        ).pack(pady=(20, 4))
+        # Compact two-line header: icon + filename + size
+        header_frame = ctk.CTkFrame(root, fg_color="transparent")
+        header_frame.pack(fill="x", padx=20, pady=(20, 8))
 
         ctk.CTkLabel(
-            root,
+            header_frame,
+            text=file_icon,
+            font=_font(28),
+            width=48,
+        ).pack(side="left", padx=(0, 12))
+
+        name_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        name_frame.pack(side="left", fill="x", expand=True)
+
+        ctk.CTkLabel(
+            name_frame,
             text=basename,
-            font=_font(12),
-            wraplength=400,
-        ).pack(pady=(0, 2))
+            font=_font(13, "bold"),
+            anchor="w",
+            wraplength=360,
+            justify="left",
+        ).pack(anchor="w")
 
+        meta_parts = []
         if size_str:
+            meta_parts.append(size_str)
+        if ext_lower and not is_dir:
+            meta_parts.append(ext_lower.upper().lstrip("."))
+        if meta_parts:
             ctk.CTkLabel(
-                root,
-                text=size_str,
+                name_frame,
+                text="  ·  ".join(meta_parts),
                 font=_font(10),
                 text_color=t["muted"],
-            ).pack(pady=(0, 4))
+                anchor="w",
+            ).pack(anchor="w")
 
-        # ── File preview ───────────────────────────────────────────────
-        _, ext_lower = os.path.splitext(self._filepath)
-        ext_lower = ext_lower.lower()
-        _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
-        _TEXT_EXTS = {
-            ".txt", ".md", ".py", ".js", ".json", ".xml", ".csv", ".log",
-        }
-        _TYPE_LABELS = {
-            ".pdf": "📄 PDF Document",
-            ".zip": "🗜 ZIP Archive",
-            ".rar": "🗜 RAR Archive",
-            ".7z": "🗜 7z Archive",
-            ".doc": "📝 Word Document",
-            ".docx": "📝 Word Document",
-            ".xls": "📊 Excel Spreadsheet",
-            ".xlsx": "📊 Excel Spreadsheet",
-            ".mp4": "🎬 Video File",
-            ".mp3": "🎵 Audio File",
-            ".exe": "⚙ Executable",
-        }
-
-        if ext_lower in _IMAGE_EXTS:
-            try:
-                from PIL import Image, ImageTk  # type: ignore[import]
-
-                img = Image.open(self._filepath)
-                try:
-                    img.thumbnail((120, 120))
-                    photo = ImageTk.PhotoImage(img)
-                    lbl = tk.Label(root, image=photo, bg=t["bg"])
-                    lbl.image = photo  # type: ignore[attr-defined]
-                    lbl.pack(pady=(0, 4))
-                finally:
-                    img.close()
-            except Exception:
-                pass
-        elif ext_lower in _TEXT_EXTS:
-            try:
-                with open(self._filepath, "r", encoding="utf-8",
-                          errors="replace") as fh:
-                    lines = []
-                    for _ in range(3):
-                        line = fh.readline()
-                        if not line:
-                            break
-                        lines.append(line.rstrip())
-                if lines:
-                    preview_text = "\n".join(lines)
-                    preview_box = ctk.CTkTextbox(
-                        root, height=60, font=ctk.CTkFont(family="Courier", size=10),
-                        state="normal",
-                    )
-                    preview_box.insert("end", preview_text)
-                    preview_box.configure(state="disabled")
-                    preview_box.pack(pady=(0, 4), padx=24, fill="x")
-            except Exception:
-                pass
-        elif ext_lower in _TYPE_LABELS:
-            ctk.CTkLabel(
-                root,
-                text=_TYPE_LABELS[ext_lower],
-                font=_font(10),
-                text_color=t["muted"],
-            ).pack(pady=(0, 4))
-
-        # ── Rename field ───────────────────────────────────────────────
-        rename_frame = ctk.CTkFrame(root, fg_color="transparent")
-        rename_frame.pack(fill="x", padx=24, pady=(0, 4))
-        ctk.CTkLabel(
-            rename_frame, text="✎ Rename:", font=_font(10),
-        ).pack(side="left")
-        rename_var = tk.StringVar(value=basename)
-        name_without_ext, _ = os.path.splitext(basename)
-        rename_entry = ctk.CTkEntry(
-            rename_frame, textvariable=rename_var, font=_font(10),
-            border_color=t["accent"],
+        # Thin separator
+        ctk.CTkFrame(root, fg_color=t["btn_bg"], height=1).pack(
+            fill="x", padx=20, pady=(0, 8)
         )
-        rename_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
 
-        def _select_filename_stem(_event: object = None) -> None:
-            rename_entry.select_range(0, len(name_without_ext))
-
-        rename_entry.bind("<FocusIn>", _select_filename_stem)
-
-        # ── Destination label ──────────────────────────────────────────
+        # ── "Send to:" label ───────────────────────────────────────────
         ctk.CTkLabel(
             root,
-            text="Where should it go?",
-            font=_font(11, "bold"),
-        ).pack(pady=(4, 0))
+            text="Send to:",
+            font=_font(10),
+            text_color=t["muted"],
+            anchor="w",
+        ).pack(anchor="w", padx=20, pady=(0, 4))
 
-        # ── Scrollable destination buttons ─────────────────────────────
-        scroll_frame = ctk.CTkScrollableFrame(root, height=180, fg_color="transparent")
-        scroll_frame.pack(fill="x", padx=24, pady=8)
-
+        # ── Destination cards ──────────────────────────────────────────
         chosen: list[str | None] = [None]
-        # Ordered list of destinations as they appear in the button list,
-        # used for keyboard-shortcut selection (keys 1-9).
-        _key_dests: list[str] = []
+        _key_dests: list[str] = []  # ordered for keyboard shortcuts 1-9 / Enter
 
         def _choose(dest: str) -> None:
             chosen[0] = dest
             root.destroy()
 
-        # "Same as last time" button
+        # Find "same as last time" candidate
         last_dest: str | None = None
-        if self._history is not None:
-            _, ext = os.path.splitext(self._filepath)
-            if ext:
-                last_dest = self._history.last_dest_for_ext(ext)
+        if self._history is not None and ext_lower:
+            last_dest = self._history.last_dest_for_ext(ext_lower)
+            if last_dest is not None and not os.path.isdir(last_dest):
+                last_dest = None
+            if last_dest is not None and last_dest not in self._destinations:
+                last_dest = None
 
-        if last_dest is not None and os.path.isdir(last_dest) and last_dest in self._destinations:
-            dest_name = os.path.basename(last_dest)
-            _ld: str = last_dest
-            _key_dests.append(_ld)
-            ctk.CTkButton(
-                scroll_frame,
-                text=f"↑ Same as last ({dest_name})",
-                fg_color=t["success"],
-                text_color="#1e1e2e",
-                hover_color=t["accent"],
-                font=_font(11, "bold"),
-                corner_radius=8,
-                command=lambda d=_ld: _choose(d),  # type: ignore[misc]
-            ).pack(fill="x", pady=(0, 6))
+        # Scroll only when there are many destinations (>5)
+        SHOW_SCROLL_THRESHOLD = 5
+        n_dests = len(self._destinations)
+        card_container: Any
+        if n_dests > SHOW_SCROLL_THRESHOLD:
+            card_container = ctk.CTkScrollableFrame(
+                root, height=300, fg_color="transparent"
+            )
+        else:
+            card_container = ctk.CTkFrame(root, fg_color="transparent")
+        card_container.pack(fill="x", padx=20, pady=(0, 6))
 
+        # "Same as last time" appears first with a distinct visual
+        if last_dest is not None:
+            _key_dests.append(last_dest)
+            self._dest_card(card_container, 0, last_dest, True, t, _choose)
+
+        btn_idx = len(_key_dests)  # starts at 1 if last_dest was added
         for dest in self._destinations:
-            if dest not in _key_dests:
-                _key_dests.append(dest)
-            label = os.path.basename(dest) if os.path.sep in dest else dest
-            ctk.CTkButton(
-                scroll_frame,
-                text=label,
-                fg_color=t["btn_bg"],
-                text_color=t["btn_fg"],
-                hover_color=t["accent"],
-                font=_font(11),
-                corner_radius=8,
-                command=lambda d=dest: _choose(d),  # type: ignore[misc]
-            ).pack(fill="x", pady=3)
+            if dest in _key_dests:
+                continue
+            _key_dests.append(dest)
+            self._dest_card(card_container, btn_idx, dest, False, t, _choose)
+            btn_idx += 1
 
-        # "New folder..." button
+        # ── "Other folder…" card ──────────────────────────────────────
         def _new_folder() -> None:
             folder = filedialog.askdirectory(
-                title="Choose new destination folder"
+                title="Choose destination folder"
             )
             if not folder:
                 return
-            # Offer to save as a permanent destination for this watched folder
+            # Offer to save as a permanent destination
             if self._on_save_destination is not None:
                 from tkinter import messagebox as _mb
                 save_it = _mb.askyesno(
-                    "Save destination?",
-                    f"Add '{os.path.basename(folder)}' as a permanent "
-                    "destination?\n\nIt will then appear in the list for "
-                    "future files.",
+                    "Save as destination?",
+                    f"Add  '{os.path.basename(folder)}'  as a permanent\n"
+                    "destination for this watched folder?\n\n"
+                    "It will appear in the list for all future files.",
                     parent=root,
                 )
                 if save_it:
@@ -301,71 +313,80 @@ class SortPrompt:
             _choose(folder)
 
         ctk.CTkButton(
-            scroll_frame,
-            text="📂 New folder…",
-            fg_color=t["accent"],
-            text_color="#1e1e2e",
-            hover_color=t["btn_active"],
-            font=_font(11, "bold"),
-            corner_radius=8,
+            card_container,
+            text="📂  Other folder…",
+            height=44,
+            fg_color="transparent",
+            border_color=t["muted"],
+            border_width=1,
+            text_color=t["muted"],
+            hover_color=t["btn_bg"],
+            font=_font(11),
+            corner_radius=10,
+            anchor="w",
             command=_new_folder,
-        ).pack(fill="x", pady=(8, 2))
+        ).pack(fill="x", pady=(6, 0))
 
-        # ── Always checkbox ────────────────────────────────────────────
-        always_var = tk.BooleanVar(value=self._always_rule_default)
-        _, ext = os.path.splitext(self._filepath)
-        ctk.CTkCheckBox(
-            root,
-            text=f"Always send {ext} files here",
-            variable=always_var,
-            font=_font(10),
-            fg_color=t["accent"],
-            hover_color=t["btn_active"],
-        ).pack(pady=(4, 4))
+        # ── Collapsible rename row ─────────────────────────────────────
+        rename_var = tk.StringVar(value=basename)
+        name_without_ext, _ = os.path.splitext(basename)
+        rename_revealed = [False]
+        rename_container = ctk.CTkFrame(root, fg_color="transparent")
 
-        # ── Auto-accept countdown ──────────────────────────────────────
-        # If enabled and there is at least one suggestion, show a countdown
-        # that automatically picks the top destination.
-        _countdown_label: ctk.CTkLabel | None = None
-        if self._auto_accept_seconds > 0 and _key_dests:
-            _auto_dest = _key_dests[0]
-            _remaining = [self._auto_accept_seconds]
+        def _toggle_rename() -> None:
+            if rename_revealed[0]:
+                rename_container.pack_forget()
+                rename_revealed[0] = False
+            else:
+                rename_container.pack(fill="x", padx=20, pady=(0, 4))
+                rename_revealed[0] = True
+                rename_entry.focus_set()
+                rename_entry.select_range(0, len(name_without_ext))
 
-            _countdown_label = ctk.CTkLabel(
-                root,
-                text=f"Auto-sorting in {_remaining[0]}s… press Escape to cancel",
-                font=_font(9),
-                text_color=t["muted"],
-            )
-            _countdown_label.pack(pady=(0, 2))
+        rename_lbl_frame = ctk.CTkFrame(root, fg_color="transparent")
+        rename_lbl_frame.pack(anchor="w", padx=20, pady=(2, 0))
+        ctk.CTkButton(
+            rename_lbl_frame,
+            text="✎  Rename before moving",
+            fg_color="transparent",
+            text_color=t["muted"],
+            hover_color="transparent",
+            font=_font(9),
+            anchor="w",
+            width=0,
+            command=_toggle_rename,
+        ).pack(side="left")
 
-            def _tick() -> None:
-                _remaining[0] -= 1
-                if _countdown_label is None:
-                    return
-                if _remaining[0] <= 0:
-                    if chosen[0] is None:
-                        _choose(_auto_dest)
-                    return
-                try:
-                    _countdown_label.configure(
-                        text=f"Auto-sorting in {_remaining[0]}s… press Escape to cancel"
-                    )
-                    root.after(1000, _tick)
-                except Exception:
-                    pass  # Window may have been destroyed
+        rename_entry = ctk.CTkEntry(
+            rename_container,
+            textvariable=rename_var,
+            font=_font(11),
+            border_color=t["accent"],
+            height=36,
+        )
+        rename_entry.pack(fill="x")
 
-            root.after(1000, _tick)
-
-        # ── Bottom buttons ─────────────────────────────────────────────
-        bottom_frame = ctk.CTkFrame(root, fg_color="transparent")
-        bottom_frame.pack(pady=(0, 16))
+        # ── Footer: action bar ─────────────────────────────────────────
+        # Quick Add (folders only) | Later | Never (whitelist) | Ignore
+        ctk.CTkFrame(root, fg_color=t["btn_bg"], height=1).pack(
+            fill="x", padx=20, pady=(8, 4)
+        )
+        footer = ctk.CTkFrame(root, fg_color="transparent")
+        footer.pack(fill="x", padx=20, pady=(0, 14))
 
         whitelisted = [False]
         quick_added = [False]
         snoozed = [False]
 
-        # Quick Add Folder button — only shown when the detected item is a directory
+        _ghost_kw: dict = dict(
+            fg_color="transparent",
+            hover_color=t["btn_bg"],
+            font=_font(10),
+            corner_radius=8,
+            height=30,
+        )
+
+        # Quick Add Folder — directory detection only
         if is_dir and self._on_quick_add is not None:
             _fp = self._filepath
             _qa = self._on_quick_add
@@ -376,17 +397,15 @@ class SortPrompt:
                 _qa(_fp)
 
             ctk.CTkButton(
-                bottom_frame,
-                text="Quick Add Folder",
-                fg_color=t["accent"],
-                text_color="#1e1e2e",
-                hover_color=t["btn_active"],
-                font=_font(10, "bold"),
-                corner_radius=8,
-                command=_do_quick_add,
-            ).pack(side="left", padx=4)
+                footer,
+                text="📂 Add & watch this folder",
+                text_color=t["accent"],
+                **_ghost_kw,
+            ).pack(side="left")  # type: ignore[arg-type]
+            # Override command after creation (can't mix ** and explicit kwarg)
+            footer.winfo_children()[-1].configure(command=_do_quick_add)
 
-        # "⏰ Later" snooze button
+        # Snooze / Later
         if self._on_snooze is not None:
             _snooze_cb = self._on_snooze
 
@@ -396,17 +415,14 @@ class SortPrompt:
                 _snooze_cb()
 
             ctk.CTkButton(
-                bottom_frame,
+                footer,
                 text="⏰ Later",
-                fg_color=t["btn_bg"],
-                text_color=t["btn_fg"],
-                hover_color=t["muted"],
-                font=_font(10),
-                corner_radius=8,
+                text_color=t["muted"],
                 command=_do_snooze,
-            ).pack(side="left", padx=4)
+                **_ghost_kw,
+            ).pack(side="left", padx=(0, 4))
 
-        # Add to whitelist button
+        # Never / whitelist
         if self._on_whitelist is not None:
             def _add_to_whitelist() -> None:
                 name = os.path.basename(self._filepath)
@@ -416,30 +432,70 @@ class SortPrompt:
                 root.destroy()
 
             ctk.CTkButton(
-                bottom_frame,
-                text="Add to whitelist",
-                fg_color=t["btn_bg"],
-                text_color=t["btn_fg"],
-                hover_color=t["muted"],
-                font=_font(10),
-                corner_radius=8,
+                footer,
+                text="🚫 Never",
+                text_color=t["muted"],
                 command=_add_to_whitelist,
-            ).pack(side="left", padx=4)
+                **_ghost_kw,
+            ).pack(side="left", padx=(0, 4))
 
-        # Ignore button
+        # Ignore (right-aligned)
         ctk.CTkButton(
-            bottom_frame,
-            text="Ignore",
-            fg_color="transparent",
+            footer,
+            text="✕ Ignore",
             text_color=t["muted"],
-            hover_color=t["btn_bg"],
-            font=_font(10),
-            corner_radius=8,
             command=root.destroy,
-        ).pack(side="left", padx=4)
+            **_ghost_kw,
+        ).pack(side="right")
+
+        # Keyboard hint in footer
+        ctk.CTkLabel(
+            footer,
+            text="1-9 · Enter · Esc",
+            font=_font(9),
+            text_color=t["muted"],
+        ).pack(side="right", padx=(0, 8))
+
+        # ── Auto-accept countdown ──────────────────────────────────────
+        if self._auto_accept_seconds > 0 and _key_dests:
+            _auto_dest = _key_dests[0]
+            _remaining = [self._auto_accept_seconds]
+
+            _cdown = ctk.CTkLabel(
+                root,
+                text=f"Auto-sorting in {_remaining[0]}s… Esc to cancel",
+                font=_font(9),
+                text_color=t["muted"],
+            )
+            _cdown.pack(pady=(0, 4))
+
+            def _tick() -> None:
+                _remaining[0] -= 1
+                if _remaining[0] <= 0:
+                    if chosen[0] is None:
+                        _choose(_auto_dest)
+                    return
+                try:
+                    _cdown.configure(
+                        text=f"Auto-sorting in {_remaining[0]}s… Esc to cancel"
+                    )
+                    root.after(1000, _tick)
+                except Exception:
+                    pass
+
+            root.after(1000, _tick)
+
+        # ── Window geometry ────────────────────────────────────────────
+        # Size to content then center; min width 440.
+        root.update_idletasks()
+        win_w = max(440, root.winfo_reqwidth())
+        win_h = root.winfo_reqheight()
+        sx = root.winfo_screenwidth() // 2 - win_w // 2
+        sy = max(40, root.winfo_screenheight() // 2 - win_h // 2)
+        root.geometry(f"{win_w}x{win_h}+{sx}+{sy}")
+        root.minsize(440, 200)
 
         # ── Keyboard shortcuts ─────────────────────────────────────────
-        # 1-9: pick destination by position; Enter: pick first; Escape: ignore
         def _on_key(event: Any) -> None:
             key = event.keysym
             if key == "Escape":
@@ -456,32 +512,30 @@ class SortPrompt:
 
         root.mainloop()
 
-        # If quick-added, the on_quick_add callback handled everything
+        # ── Post-close logic ───────────────────────────────────────────
         if quick_added[0]:
             return
 
-        # If snoozed, the snooze callback handles re-queuing
         if snoozed[0]:
             return
 
-        # If whitelisted, skip callback — file stays in place
         if whitelisted[0]:
             self._on_done(self._filepath, None, False)
             return
 
-        # If user renamed the file, apply the rename before callback
+        # Apply optional rename before handing off
         new_name = rename_var.get().strip()
         if new_name and new_name != basename and os.path.exists(self._filepath):
-            new_path = os.path.join(
-                os.path.dirname(self._filepath), new_name
-            )
+            new_path = os.path.join(os.path.dirname(self._filepath), new_name)
             try:
                 os.rename(self._filepath, new_path)
                 self._filepath = new_path
             except OSError:
                 pass
 
-        self._on_done(self._filepath, chosen[0], always_var.get())
+        # "always" is intentionally always False — rule creation is background-
+        # only (auto-learn from history).  The user just clicks, not configures.
+        self._on_done(self._filepath, chosen[0], False)
 
 
 # ── SetupWizard ───────────────────────────────────────────────────────

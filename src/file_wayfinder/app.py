@@ -384,7 +384,6 @@ class App:
         )
 
         theme_name = self.config.get_setting("theme", "dark")
-        always_rule_default = self.config.get_setting("prompt_always_rule", True)
         auto_accept_secs = self.config.get_setting("prompt_auto_accept_seconds", 0)
 
         # Capture for the closure — parent_monitored is already correctly resolved above.
@@ -406,7 +405,7 @@ class App:
             history=self.history,
             on_snooze=lambda fp=filepath: self._on_snooze_file(fp),
             on_save_destination=_on_save_destination,
-            always_rule_default=always_rule_default,
+            always_rule_default=False,
             auto_accept_seconds=auto_accept_secs,
         )
 

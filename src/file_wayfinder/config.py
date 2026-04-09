@@ -53,7 +53,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "prompt_delay_seconds": 3.0,
         "theme": "dark",
         # Pre-check "Always send .ext files here" in the sort prompt
-        "prompt_always_rule": True,
+        # (default False — the prompt focuses on one-click sorting, not rule creation)
+        "prompt_always_rule": False,
         # Auto-accept the top suggestion after N seconds (0 = disabled)
         "prompt_auto_accept_seconds": 0,
         # Monitoring
