@@ -150,20 +150,19 @@ def _find_appimagetool() -> str | None:
         if os.path.isfile(env_path) and os.access(env_path, os.X_OK):
             return env_path
 
-    # Check common locations
+    # Prefer repo-local tool first for deterministic CI behavior.
     candidates = [
         os.path.join(_SCRIPT_DIR, "appimagetool"),
         os.path.join(_SCRIPT_DIR, "appimagetool-x86_64.AppImage"),
-        "appimagetool",
-        "appimagetool-x86_64.AppImage",
     ]
     for candidate in candidates:
-        absolute_candidate = os.path.abspath(candidate)
-        found = _shutil.which(candidate) or (
-            os.path.isfile(absolute_candidate) and os.access(absolute_candidate, os.X_OK) and absolute_candidate
-        )
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return os.path.abspath(candidate)
+
+    for name in ("appimagetool", "appimagetool-x86_64.AppImage"):
+        found = _shutil.which(name)
         if found:
-            return found
+            return os.path.abspath(found)
     return None
 
 
