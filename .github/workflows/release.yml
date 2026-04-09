@@ -16,11 +16,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: file-wayfinder-linux
+            artifact: iconic-file-filer-linux
           - os: windows-latest
-            artifact: file-wayfinder-windows
+            artifact: iconic-file-filer-windows
           - os: macos-latest
-            artifact: file-wayfinder-macos
+            artifact: iconic-file-filer-macos
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,11 +38,11 @@ jobs:
       - name: Rename Windows binary
         if: runner.os == 'Windows'
         shell: bash
-        run: mv dist/file-wayfinder.exe "dist/FileWayfinder-windows-x86_64.exe"
+        run: mv dist/iconic-filer.exe "dist/IconicFileFiler-windows-x86_64.exe"
 
       - name: Rename macOS binary
         if: runner.os == 'macOS'
-        run: mv dist/file-wayfinder "dist/FileWayfinder-macos-arm64"
+        run: mv dist/iconic-filer "dist/IconicFileFiler-macos-arm64"
 
       # ── Linux: onedir + AppImage + plain binary ────────────────────
       - name: Install Linux build dependencies
@@ -69,8 +69,8 @@ jobs:
       - name: Rename AppImage with version
         if: runner.os == 'Linux'
         run: |
-          VERSION=$(python -c 'from file_wayfinder import __version__; print(__version__)')
-          mv dist/FileWayfinder-x86_64.AppImage "dist/FileWayfinder-${VERSION}-x86_64.AppImage"
+          VERSION=$(python -c 'from iconic_filer import __version__; print(__version__)')
+          mv dist/IconicFiler-x86_64.AppImage "dist/IconicFileFiler-${VERSION}-x86_64.AppImage"
 
       - name: Build plain binary (Linux)
         if: runner.os == 'Linux'
