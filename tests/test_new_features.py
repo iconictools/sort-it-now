@@ -544,3 +544,44 @@ class TestSortPromptWhitelist:
             on_done=lambda *a: None,
         )
         assert prompt._on_whitelist is None
+
+
+class TestDestinationPicker:
+    def test_pick_destination_folders_multi_and_dedup(self, monkeypatch):
+        from iconic_filer.prompt import pick_destination_folders
+
+        picks = iter(["/tmp/d1", "/tmp/d1", "/tmp/d2"])
+        add_more = iter([True, True, False])
+        shown_infos: list[str] = []
+
+        monkeypatch.setattr(
+            "iconic_filer.prompt.filedialog.askdirectory",
+            lambda **_: next(picks),
+        )
+        monkeypatch.setattr(
+            "iconic_filer.prompt.messagebox.askyesno",
+            lambda *_, **__: next(add_more),
+        )
+        monkeypatch.setattr(
+            "iconic_filer.prompt.messagebox.showinfo",
+            lambda _title, message, **__: shown_infos.append(message),
+        )
+
+        result = pick_destination_folders("/tmp/source")
+        assert result == ["/tmp/d1", "/tmp/d2"]
+        assert len(shown_infos) == 1
+
+
+class TestTrayMenuCallbacks:
+    def test_tray_action_wrapper_accepts_pystray_args(self):
+        from iconic_filer.tray import TrayIcon
+
+        called = {"count": 0}
+
+        def _cb():
+            called["count"] += 1
+
+        wrapped = TrayIcon._action(_cb)
+
+        wrapped(None, None)
+        assert called["count"] == 1

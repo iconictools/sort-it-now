@@ -20,7 +20,7 @@ from iconic_filer.duplicate import find_duplicate
 from iconic_filer.history import History
 from iconic_filer.ipc import IPCServer
 from iconic_filer.notifications import notify
-from iconic_filer.prompt import SortPrompt, SetupWizard
+from iconic_filer.prompt import SortPrompt, SetupWizard, pick_destination_folders
 from iconic_filer.rules import Rules
 from iconic_filer.rules_ui import RulesDialog
 from iconic_filer.settings_ui import SettingsDialog
@@ -642,23 +642,13 @@ class App:
             return
 
         # Pick initial destination folders for this monitored folder
-        dests: list[str] = []
         messagebox.showinfo(
             "Add destinations",
-            "Now choose one or more destination folders for files from:\n"
-            f"{folder}\n\n"
-            "You will be prompted to pick each destination. Click Cancel when done.",
+            "Choose one or more destination folders for files from:\n"
+            f"{folder}",
             parent=root,
         )
-        while True:
-            dest = filedialog.askdirectory(
-                title=f"Destination folder for {os.path.basename(folder)} (Cancel to finish)",
-                parent=root,
-            )
-            if not dest:
-                break
-            if dest not in dests:
-                dests.append(dest)
+        dests = pick_destination_folders(folder, parent=root)
 
         if not dests:
             messagebox.showwarning(
@@ -760,19 +750,10 @@ class App:
             messagebox.showinfo(
                 "Quick Add Folder — Destinations",
                 f"Choose destination folders for:\n{folder_path}\n\n"
-                "Click Cancel when finished.",
+                "You can add multiple destinations.",
                 parent=root,
             )
-            dests = []
-            while True:
-                dest = filedialog.askdirectory(
-                    title=f"Destination for {os.path.basename(folder_path)} (Cancel to finish)",
-                    parent=root,
-                )
-                if not dest:
-                    break
-                if dest not in dests:
-                    dests.append(dest)
+            dests = pick_destination_folders(folder_path, parent=root)
             root.destroy()
 
             if not dests:
@@ -913,5 +894,4 @@ class App:
             for filepath in queue:
                 if os.path.exists(filepath):
                     self._on_file_detected(filepath)
-
 

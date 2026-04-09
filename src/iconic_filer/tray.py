@@ -110,9 +110,19 @@ class TrayIcon:
         self._focus_mode = False
         self._monitored_count = 0
 
+    @staticmethod
+    def _action(callback: Callable[[], None]) -> Callable[..., None]:
+        """Return a pystray-compatible action callback."""
+        def _wrapped(*_args: object) -> None:
+            callback()
+        return _wrapped
+
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
-            pystray.MenuItem("Add folder to watch...", lambda: self._on_add_folder()),
+            pystray.MenuItem(
+                "Add folder to watch...",
+                self._action(self._on_add_folder),
+            ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 lambda _: (
@@ -120,21 +130,21 @@ class TrayIcon:
                     if self._pending_count > 0
                     else "Sort pending files"
                 ),
-                lambda: self._on_process_pending(),
+                self._action(self._on_process_pending),
                 visible=lambda _: self._pending,
             ),
             pystray.MenuItem(
                 "Focus mode",
-                lambda: self._on_focus(),
+                self._action(self._on_focus),
                 checked=lambda _: self._focus_mode,
             ),
-            pystray.MenuItem("Undo last move", lambda: self._on_undo()),
+            pystray.MenuItem("Undo last move", self._action(self._on_undo)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Dashboard", lambda: self._on_dashboard()),
-            pystray.MenuItem("Settings", lambda: self._on_settings()),
-            pystray.MenuItem("Manage Rules", lambda: self._on_rules()),
+            pystray.MenuItem("Dashboard", self._action(self._on_dashboard)),
+            pystray.MenuItem("Settings", self._action(self._on_settings)),
+            pystray.MenuItem("Manage Rules", self._action(self._on_rules)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit", lambda: self._quit()),
+            pystray.MenuItem("Quit", self._action(self._quit)),
         )
 
     def _quit(self) -> None:

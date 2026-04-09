@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 import customtkinter as ctk
 
 from iconic_filer.autostart import is_autostart_enabled, set_autostart
+from iconic_filer.prompt import pick_destination_folders
 from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
@@ -409,17 +410,25 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
             messagebox.showwarning("No folder selected", "Select a watched folder first.", parent=root)
             return
         folder = _selected_folder[0]
-        dest = filedialog.askdirectory(title=f"Add destination for {os.path.basename(folder)}")
-        if not dest:
+        picked = pick_destination_folders(folder, parent=root)
+        if not picked:
             return
-        dest = os.path.abspath(dest)
         current = list(cfg.get_folder_destinations(folder))
-        if dest in current:
-            messagebox.showinfo("Already added", f"Already a destination:\n{dest}", parent=root)
+        added_any = False
+        for dest in picked:
+            if dest in current:
+                continue
+            current.append(dest)
+            dest_list.insert("end", dest)
+            added_any = True
+        if not added_any:
+            messagebox.showinfo(
+                "Already added",
+                "All selected folders are already destinations for this watched folder.",
+                parent=root,
+            )
             return
-        current.append(dest)
         cfg.set_destinations(folder, current)
-        dest_list.insert("end", dest)
 
     def _remove_dest() -> None:
         if not _selected_folder:
