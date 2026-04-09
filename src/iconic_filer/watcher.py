@@ -1,4 +1,4 @@
-"""File system watcher for Iconic Filer.
+"""File system watcher for Iconic File Filer.
 
 Uses *watchdog* to monitor folders for new, moved, or modified files.
 Implements smart stability detection:

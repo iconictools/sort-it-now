@@ -1,4 +1,4 @@
-"""User prompt dialogs for Iconic Filer (customtkinter-based)."""
+"""User prompt dialogs for Iconic File Filer (customtkinter-based)."""
 
 from __future__ import annotations
 
@@ -162,7 +162,7 @@ class SortPrompt:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("Iconic Filer")
+        root.title("Iconic File Filer")
         root.attributes("-topmost", True)
         root.resizable(True, False)
 
@@ -573,7 +573,7 @@ class SetupWizard:
 
         root = ctk.CTk()
         self._root = root
-        root.title("Iconic Filer — Setup")
+        root.title("Iconic File Filer — Setup")
         root.resizable(False, False)
 
         w, h = 560, 520
@@ -583,7 +583,7 @@ class SetupWizard:
 
         ctk.CTkLabel(
             root,
-            text="🗂 Iconic Filer — Setup",
+            text="🗂 Iconic File Filer — Setup",
             font=_font(18, "bold"),
             text_color=t["accent"],
         ).pack(pady=(24, 4))
@@ -697,7 +697,7 @@ def cli_setup() -> dict[str, list[str]]:
 
     Returns ``{folder: [destinations]}`` or empty dict if cancelled.
     """
-    print("\n=== Iconic Filer -- CLI Setup ===\n")
+    print("\n=== Iconic File Filer -- CLI Setup ===\n")
     folders: dict[str, list[str]] = {}
 
     while True:

@@ -1,4 +1,4 @@
-"""Main application orchestrator for Iconic Filer."""
+"""Main application orchestrator for Iconic File Filer."""
 
 from __future__ import annotations
 
@@ -174,7 +174,7 @@ class App:
                         folder, self._on_file_detected, whitelist,
                     )
 
-        logger.info("Iconic Filer is running.")
+        logger.info("Iconic File Filer is running.")
         self._ipc_server.start()
         self._update_tray_monitored_count()
         # Start background cleanup-reminder polling thread
@@ -201,7 +201,7 @@ class App:
         self.tray.set_monitored_count(count)
 
     def _handle_ipc_command(self, command: str) -> None:
-        """Handle a command sent by another Iconic Filer instance via IPC.
+        """Handle a command sent by another Iconic File Filer instance via IPC.
 
         Currently supported commands:
         ``ADD_FOLDER:<abs_path>`` — start watching the given folder, inheriting

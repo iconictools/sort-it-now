@@ -1,4 +1,4 @@
-"""Rule management UI for Iconic Filer (customtkinter-based).
+"""Rule management UI for Iconic File Filer (customtkinter-based).
 
 Lets the user view, add, edit, and delete auto-sort rules through a
 card-based interface that matches the main prompt design.
@@ -109,7 +109,7 @@ class RulesDialog:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("Iconic Filer — Rules")
+        root.title("Iconic File Filer — Rules")
         root.resizable(True, True)
 
         w, h = 580, 680

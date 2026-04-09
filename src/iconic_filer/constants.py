@@ -1,4 +1,4 @@
-"""Constants and default settings for Iconic Filer."""
+"""Constants and default settings for Iconic File Filer."""
 
 from __future__ import annotations
 

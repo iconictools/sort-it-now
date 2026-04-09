@@ -1,4 +1,4 @@
-"""Achievement system for Iconic Filer."""
+"""Achievement system for Iconic File Filer."""
 
 from __future__ import annotations
 

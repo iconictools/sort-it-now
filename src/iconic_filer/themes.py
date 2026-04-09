@@ -1,4 +1,4 @@
-"""Theme management for Iconic Filer.
+"""Theme management for Iconic File Filer.
 
 Supports dark and light themes for all tkinter / customtkinter windows.
 """

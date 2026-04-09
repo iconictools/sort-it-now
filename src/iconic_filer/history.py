@@ -1,4 +1,4 @@
-"""Undo / action history backed by SQLite for Iconic Filer."""
+"""Undo / action history backed by SQLite for Iconic File Filer."""
 
 from __future__ import annotations
 

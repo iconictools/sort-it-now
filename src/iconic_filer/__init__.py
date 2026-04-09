@@ -1,3 +1,3 @@
-"""Iconic Filer - Tray-resident real-time file organizer assistant."""
+"""Iconic File Filer - Tray-resident real-time file organizer assistant."""
 
 __version__ = "0.1.0"

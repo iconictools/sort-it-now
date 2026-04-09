@@ -1,4 +1,4 @@
-"""System tray icon for Iconic Filer (pystray-based)."""
+"""System tray icon for Iconic File Filer (pystray-based)."""
 
 from __future__ import annotations
 
@@ -147,7 +147,7 @@ class TrayIcon:
         self._icon = pystray.Icon(
             "iconic-filer",
             _icon_idle(),
-            "Iconic Filer",
+            "Iconic File Filer",
             menu=self._build_menu(),
         )
         self._icon.run()
@@ -169,7 +169,7 @@ class TrayIcon:
         if self._icon:
             if pending:
                 self._icon.icon = _icon_pending(count)
-                self._icon.title = f"Iconic Filer ({count} pending)"
+                self._icon.title = f"Iconic File Filer ({count} pending)"
             else:
                 self._refresh_idle_icon()
 
@@ -185,9 +185,9 @@ class TrayIcon:
             self._icon.icon = _icon_idle()
             n = self._monitored_count
             if n > 0:
-                self._icon.title = f"Iconic Filer ({n} folder{'s' if n != 1 else ''} watched)"
+                self._icon.title = f"Iconic File Filer ({n} folder{'s' if n != 1 else ''} watched)"
             else:
-                self._icon.title = "Iconic Filer"
+                self._icon.title = "Iconic File Filer"
 
     def stop(self) -> None:
         if self._icon:

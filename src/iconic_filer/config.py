@@ -1,4 +1,4 @@
-"""Configuration management for Iconic Filer.
+"""Configuration management for Iconic File Filer.
 
 Stores monitored folders, destination sets, and user preferences as JSON.
 

@@ -1,4 +1,4 @@
-"""Autostart on login management for Iconic Filer.
+"""Autostart on login management for Iconic File Filer.
 
 On Windows this uses the ``HKCU\\...\\Run`` registry key.
 On Linux this creates/removes a ``.desktop`` file in

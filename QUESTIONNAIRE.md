@@ -1,4 +1,4 @@
-# Iconic Filer — Project Analysis & Design Questionnaire
+# Iconic File Filer — Project Analysis & Design Questionnaire
 
 > **Purpose:** This document rates the current state of the project and asks
 > you (the project owner) about every unaddressed decision and improvement
@@ -293,7 +293,7 @@ Rate each feature: **H**igh / **M**edium / **L**ow / **N**o (don't want it).
 
 ---
 
-## 🧭 Iconic Filer — Direction Questionnaire (Round 2)
+## 🧭 Iconic File Filer — Direction Questionnaire (Round 2)
 
 > Now that the core features are built, here are the roadblocks, ideas, and
 > questions I need your direction on. Reply inline or via PR comments.
@@ -425,10 +425,10 @@ most-used destinations, average files per day.
 
 ---
 
-### D9. Iconic Filer Icon & Branding
+### D9. Iconic File Filer Icon & Branding
 
 **Context:** The tray icon is currently a simple programmatically-drawn
-blue folder shape. With the rename to Iconic Filer, we could design
+blue folder shape. With the rename to Iconic File Filer, we could design
 a proper icon.
 
 **Question:** Should I:
@@ -469,7 +469,7 @@ undo the rename.
 - [ ] Cloud sync of config/rules (e.g. via Google Drive or Dropbox folder)
 - [ ] Plugins/extensions API for custom sort logic
 - [ ] File type learning from content (not just extension)
-- [ ] Right-click context menu integration ("Sort with Iconic Filer")
+- [ ] Right-click context menu integration ("Sort with Iconic File Filer")
 - [ ] Batch rename tool (separate from sort, just for renaming files)
 
 → **Ratings:**

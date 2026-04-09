@@ -1,4 +1,4 @@
-"""Extracted dashboard and batch-list windows for Iconic Filer."""
+"""Extracted dashboard and batch-list windows for Iconic File Filer."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def show_dashboard(
     apply_ctk_appearance(theme_name)
 
     root = ctk.CTk()
-    root.title("Iconic Filer — Dashboard")
+    root.title("Iconic File Filer — Dashboard")
     root.geometry("600x680")
 
     # ── Header ────────────────────────────────────────────────────────
@@ -325,7 +325,7 @@ def show_batch_list(
     apply_ctk_appearance(theme_name)
 
     root = ctk.CTk()
-    root.title("Iconic Filer — Batch Processing")
+    root.title("Iconic File Filer — Batch Processing")
     root.geometry("640x480")
 
     ctk.CTkLabel(

@@ -1,4 +1,4 @@
-"""Conflict resolution UI for Iconic Filer.
+"""Conflict resolution UI for Iconic File Filer.
 
 When a file already exists at the destination, presents the user with
 options to overwrite, rename, or skip.
@@ -63,7 +63,7 @@ def resolve_conflict(
     result: list[str | None] = [None]
 
     root = ctk.CTk()
-    root.title("Iconic Filer — File Conflict")
+    root.title("Iconic File Filer — File Conflict")
     root.attributes("-topmost", True)
     root.resizable(False, False)
 

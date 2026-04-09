@@ -1,4 +1,4 @@
-"""Duplicate file detection for Iconic Filer."""
+"""Duplicate file detection for Iconic File Filer."""
 
 from __future__ import annotations
 

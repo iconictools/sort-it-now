@@ -1,4 +1,4 @@
-"""Entry point for Iconic Filer.
+"""Entry point for Iconic File Filer.
 
 Usage:
     python -m iconic_filer          # Run the app (GUI)
@@ -139,7 +139,7 @@ def main(argv: list[str] | None = None) -> None:
                 _root = tk.Tk()
                 _root.withdraw()
                 merge = messagebox.askyesno(
-                    "Iconic Filer is already running",
+                    "Iconic File Filer is already running",
                     "Another instance is already running.\n\n"
                     "Do you want to add a new folder to the running instance?\n\n"
                     "(Choose No to open a separate, independent instance.)",
@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> None:
                 _root = tk.Tk()
                 _root.withdraw()
                 folder = filedialog.askdirectory(
-                    title="Choose a folder for the running Iconic Filer to watch"
+                    title="Choose a folder for the running Iconic File Filer to watch"
                 )
                 _root.destroy()
                 if folder:

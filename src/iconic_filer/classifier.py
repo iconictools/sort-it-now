@@ -1,4 +1,4 @@
-"""Smart file classification for Iconic Filer.
+"""Smart file classification for Iconic File Filer.
 
 Suggests destination folders based on file extension, name patterns,
 and learned rules.

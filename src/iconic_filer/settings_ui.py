@@ -1,4 +1,4 @@
-"""Settings dialog for Iconic Filer (customtkinter-based).
+"""Settings dialog for Iconic File Filer (customtkinter-based).
 
 Layout (tabbed):
   Tab 1 — General     : theme, notifications, undo restore-name, multi-instance
@@ -667,7 +667,7 @@ def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk
         if path:
             cfg.import_config(path)
             messagebox.showinfo(
-                "Import", "Config imported. Restart Iconic Filer to apply.", parent=root
+                "Import", "Config imported. Restart Iconic File Filer to apply.", parent=root
             )
 
     _btn(io_frame, "Export Config…", t, _export, "normal").pack(side="left", padx=(0, 6))
@@ -697,7 +697,7 @@ class SettingsDialog:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("Iconic Filer — Settings")
+        root.title("Iconic File Filer — Settings")
         root.resizable(True, True)
         root.minsize(560, 560)
 

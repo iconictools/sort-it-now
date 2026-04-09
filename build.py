@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local build script for Iconic Filer.
+"""Local build script for Iconic File Filer.
 
 Creates a standalone executable using PyInstaller, and optionally packages it
 as a Linux AppImage.
@@ -99,7 +99,7 @@ def _build_appimage(dist_dir: str) -> None:
     with open(desktop_path, "w", encoding="utf-8") as fh:
         fh.write(
             "[Desktop Entry]\n"
-            "Name=Iconic Filer\n"
+            "Name=Iconic File Filer\n"
             "Exec=iconic-filer\n"
             "Icon=iconic-filer\n"
             "Type=Application\n"
@@ -161,7 +161,7 @@ def _find_appimagetool() -> str | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build Iconic Filer executable")
+    parser = argparse.ArgumentParser(description="Build Iconic File Filer executable")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--onefile",

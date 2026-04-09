@@ -1,4 +1,4 @@
-"""Auto-rules / pattern learning for Iconic Filer.
+"""Auto-rules / pattern learning for Iconic File Filer.
 
 Persists extension-to-destination mappings so the app can auto-sort
 files the user has previously classified.
