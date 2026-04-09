@@ -3,7 +3,7 @@
 import os
 import tempfile
 
-from file_wayfinder.rules import Rules
+from iconic_filer.rules import Rules
 
 
 class TestRules:

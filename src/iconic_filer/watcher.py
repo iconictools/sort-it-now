@@ -1,4 +1,4 @@
-"""File system watcher for File Wayfinder.
+"""File system watcher for Iconic File Filer.
 
 Uses *watchdog* to monitor folders for new, moved, or modified files.
 Implements smart stability detection:
@@ -24,8 +24,8 @@ from typing import Callable
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from file_wayfinder.classifier import is_temp_file, matches_ignore_pattern
-from file_wayfinder.constants import (
+from iconic_filer.classifier import is_temp_file, matches_ignore_pattern
+from iconic_filer.constants import (
     FILE_STABLE_CHECK_INTERVAL,
     FILE_STABLE_DELAY_SECONDS,
     FILE_STABLE_MAX_CHECKS,

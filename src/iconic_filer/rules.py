@@ -1,4 +1,4 @@
-"""Auto-rules / pattern learning for File Wayfinder.
+"""Auto-rules / pattern learning for Iconic File Filer.
 
 Persists extension-to-destination mappings so the app can auto-sort
 files the user has previously classified.
@@ -15,7 +15,7 @@ import shutil
 import time
 from typing import Any
 
-from file_wayfinder.constants import DEFAULT_RULES_FILE
+from iconic_filer.constants import DEFAULT_RULES_FILE
 
 logger = logging.getLogger(__name__)
 

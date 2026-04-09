@@ -1,4 +1,4 @@
-"""Native toast notifications for File Wayfinder."""
+"""Native toast notifications for Iconic File Filer."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ def notify(
                 title=title,
                 message=message,
                 timeout=timeout,
-                app_name="File Wayfinder",
+                app_name="Iconic File Filer",
             )
             return
         except Exception as exc:

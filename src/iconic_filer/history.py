@@ -1,4 +1,4 @@
-"""Undo / action history backed by SQLite for File Wayfinder."""
+"""Undo / action history backed by SQLite for Iconic File Filer."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import shutil
 import sqlite3
 import time
 
-from file_wayfinder.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
+from iconic_filer.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
 
 logger = logging.getLogger(__name__)
 

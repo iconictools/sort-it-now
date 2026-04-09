@@ -1,4 +1,4 @@
-"""Smart file classification for File Wayfinder.
+"""Smart file classification for Iconic File Filer.
 
 Suggests destination folders based on file extension, name patterns,
 and learned rules.
@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from fnmatch import fnmatch
 
-from file_wayfinder.constants import FILE_TYPE_MAP, TEMP_EXTENSIONS
+from iconic_filer.constants import FILE_TYPE_MAP, TEMP_EXTENSIONS
 
 
 def is_temp_file(filepath: str) -> bool:

@@ -1,4 +1,4 @@
-"""Configuration management for File Wayfinder.
+"""Configuration management for Iconic File Filer.
 
 Stores monitored folders, destination sets, and user preferences as JSON.
 
@@ -26,7 +26,7 @@ import time
 import zipfile
 from typing import Any
 
-from file_wayfinder.constants import DEFAULT_CONFIG_FILE
+from iconic_filer.constants import DEFAULT_CONFIG_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +46,17 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     "global_settings": {
         # UI / behaviour
         "focus_mode": False,
-        "snooze_minutes": 0,
+        # Minutes to snooze a file before re-prompting (default 30; set to 0 to disable)
+        "snooze_minutes": 30,
         "batch_mode": False,
         "batch_mode_style": "one-by-one",
         "prompt_delay_seconds": 3.0,
         "theme": "dark",
+        # Pre-check "Always send .ext files here" in the sort prompt
+        # (default False — the prompt focuses on one-click sorting, not rule creation)
+        "prompt_always_rule": False,
+        # Auto-accept the top suggestion after N seconds (0 = disabled)
+        "prompt_auto_accept_seconds": 0,
         # Monitoring
         "scan_existing_enabled": False,
         "catch_folders": False,
@@ -63,6 +69,9 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "pattern_rules_enabled": True,
         # Duplicate detection
         "duplicate_detection": False,
+        # Conflict resolution: "rename" | "overwrite" | "skip" | "ask"
+        # What to do when a file already exists at the destination.
+        "conflict_resolution": "rename",
         # Undo behaviour: "ask" | "always" | "never"
         # When undoing a move that also involved a rename, should the
         # original filename be restored?
@@ -77,6 +86,10 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "quick_add_auto_start_watch": True,
         # Cleanup reminders: 0 = disabled, N = alert when folder has >= N files
         "cleanup_reminder_threshold": 0,
+        # Auto-learn: automatically create an extension rule after this many
+        # manual sorts of the same extension to the same destination.
+        # Default is 0 (disabled) — rule building is opt-in via Settings.
+        "auto_learn_threshold": 0,
     },
     "ignore_patterns": [
         "~$*",

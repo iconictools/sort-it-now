@@ -16,11 +16,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: file-wayfinder-linux
+            artifact: iconic-file-filer-linux
           - os: windows-latest
-            artifact: file-wayfinder-windows
+            artifact: iconic-file-filer-windows
           - os: macos-latest
-            artifact: file-wayfinder-macos
+            artifact: iconic-file-filer-macos
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,13 +30,77 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: pip install -e .
       - run: pytest --tb=short -q
-      - name: Build executable
+
+      - name: Build executable (Windows / macOS)
+        if: runner.os != 'Linux'
         run: python build.py --onefile
+
+      - name: Rename Windows binary
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv dist/iconic-filer.exe "dist/IconicFileFiler-windows-x86_64.exe"
+
+      - name: Rename macOS binary
+        if: runner.os == 'macOS'
+        run: mv dist/iconic-filer "dist/IconicFileFiler-macos-arm64"
+
+      # ── Linux: onedir + AppImage + plain binary ────────────────────
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libfuse2 python3-tk fuse
+
+      - name: Download appimagetool
+        if: runner.os == 'Linux'
+        run: |
+          wget -q \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -O appimagetool
+          chmod +x appimagetool
+
+      - name: Build AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: python build.py --appimage
+        env:
+          ARCH: x86_64
+          APPIMAGETOOL: ${{ github.workspace }}/appimagetool
+
+      - name: Rename AppImage with version
+        if: runner.os == 'Linux'
+        run: |
+          VERSION=$(python -c 'from iconic_filer import __version__; print(__version__)')
+          mv dist/IconicFiler-x86_64.AppImage "dist/IconicFileFiler-${VERSION}-x86_64.AppImage"
+
+      - name: Build plain binary (Linux)
+        if: runner.os == 'Linux'
+        run: python build.py --onefile
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: dist/
           retention-days: 30
+
+      - name: Upload diagnostics (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failure-diagnostics-${{ matrix.os }}
+          path: |
+            build/
+            dist/
+            AppDir/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Failure summary (on failure)
+        if: failure()
+        run: |
+          echo "### Release build failed on ${{ matrix.os }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact: ci-failure-diagnostics-${{ matrix.os }}" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     name: Create GitHub Release
@@ -47,6 +111,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+          merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

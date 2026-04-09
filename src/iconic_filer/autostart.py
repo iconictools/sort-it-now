@@ -1,8 +1,10 @@
-"""Autostart on login management for File Wayfinder.
+"""Autostart on login management for Iconic File Filer.
 
 On Windows this uses the ``HKCU\\...\\Run`` registry key.
 On Linux this creates/removes a ``.desktop`` file in
 ``~/.config/autostart/`` (XDG autostart specification).
+On macOS this creates/removes a LaunchAgent plist in
+``~/Library/LaunchAgents/``.
 On other platforms this is a no-op with a logged warning.
 """
 
@@ -14,8 +16,9 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-_APP_NAME = "FileWayfinder"
-_DESKTOP_FILENAME = "file-wayfinder.desktop"
+_APP_NAME = "IconicFiler"
+_DESKTOP_FILENAME = "iconic-filer.desktop"
+_MACOS_PLIST_FILENAME = "com.iconic-filer.plist"
 
 
 def _linux_desktop_path() -> str:
@@ -27,11 +30,27 @@ def _linux_desktop_path() -> str:
     return os.path.join(autostart_dir, _DESKTOP_FILENAME)
 
 
-def _linux_exec_cmd() -> str:
-    """Return the command used to launch the app on Linux."""
+def _frozen_or_module_cmd() -> str:
+    """Return the shell command used to launch the app on this platform."""
     if getattr(sys, "frozen", False):
         return sys.executable
-    return f"{sys.executable} -m file_wayfinder"
+    return f"{sys.executable} -m iconic_filer"
+
+
+def _linux_exec_cmd() -> str:
+    """Return the command used to launch the app on Linux."""
+    return _frozen_or_module_cmd()
+
+
+def _macos_exec_cmd() -> str:
+    """Return the command used to launch the app on macOS."""
+    return _frozen_or_module_cmd()
+
+
+def _macos_plist_path() -> str:
+    """Return the LaunchAgent plist file path for macOS."""
+    launch_agents_dir = os.path.expanduser("~/Library/LaunchAgents")
+    return os.path.join(launch_agents_dir, _MACOS_PLIST_FILENAME)
 
 
 def is_autostart_enabled() -> bool:
@@ -59,6 +78,9 @@ def is_autostart_enabled() -> bool:
     if sys.platform.startswith("linux"):
         return os.path.isfile(_linux_desktop_path())
 
+    if sys.platform == "darwin":
+        return os.path.isfile(_macos_plist_path())
+
     return False
 
 
@@ -82,7 +104,7 @@ def set_autostart(enabled: bool) -> bool:
                     if getattr(sys, "frozen", False):
                         exe = sys.executable
                     else:
-                        exe = f'"{sys.executable}" -m file_wayfinder'
+                        exe = f'"{sys.executable}" -m iconic_filer'
                     winreg.SetValueEx(key, _APP_NAME, 0, winreg.REG_SZ, exe)
                     logger.info("Autostart enabled (Windows registry).")
                 else:
@@ -121,6 +143,48 @@ def set_autostart(enabled: bool) -> bool:
                 except FileNotFoundError:
                     pass
                 logger.info("Autostart disabled (XDG desktop removed).")
+            return True
+        except OSError as exc:
+            logger.error("Failed to set autostart: %s", exc)
+            return False
+
+    if sys.platform == "darwin":
+        plist_path = _macos_plist_path()
+        try:
+            if enabled:
+                os.makedirs(os.path.dirname(plist_path), exist_ok=True)
+                exec_cmd = _macos_exec_cmd()
+                # Split cmd into an array for ProgramArguments
+                parts = exec_cmd.split()
+                program_args = "".join(f"        <string>{p}</string>\n" for p in parts)
+                plist_content = (
+                    '<?xml version="1.0" encoding="UTF-8"?>\n'
+                    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"'
+                    ' "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+                    '<plist version="1.0">\n'
+                    "<dict>\n"
+                    "    <key>Label</key>\n"
+                    f"    <string>com.iconic-filer</string>\n"
+                    "    <key>ProgramArguments</key>\n"
+                    "    <array>\n"
+                    f"{program_args}"
+                    "    </array>\n"
+                    "    <key>RunAtLoad</key>\n"
+                    "    <true/>\n"
+                    "    <key>KeepAlive</key>\n"
+                    "    <false/>\n"
+                    "</dict>\n"
+                    "</plist>\n"
+                )
+                with open(plist_path, "w", encoding="utf-8") as fh:
+                    fh.write(plist_content)
+                logger.info("Autostart enabled (macOS LaunchAgent: %s).", plist_path)
+            else:
+                try:
+                    os.remove(plist_path)
+                except FileNotFoundError:
+                    pass
+                logger.info("Autostart disabled (macOS LaunchAgent removed).")
             return True
         except OSError as exc:
             logger.error("Failed to set autostart: %s", exc)

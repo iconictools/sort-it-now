@@ -1,4 +1,4 @@
-"""Main application orchestrator for File Wayfinder."""
+"""Main application orchestrator for Iconic File Filer."""
 
 from __future__ import annotations
 
@@ -10,22 +10,22 @@ import shutil
 import sys
 import threading
 
-from file_wayfinder.achievements import Achievements
-from file_wayfinder.classifier import suggest_destinations
-from file_wayfinder.config import Config
-from file_wayfinder.conflict_ui import resolve_conflict
-from file_wayfinder.constants import DEFAULT_UNSORTED_DIR
-from file_wayfinder.dashboard_ui import show_batch_list, show_dashboard
-from file_wayfinder.duplicate import find_duplicate
-from file_wayfinder.history import History
-from file_wayfinder.ipc import IPCServer
-from file_wayfinder.notifications import notify
-from file_wayfinder.prompt import SortPrompt, SetupWizard
-from file_wayfinder.rules import Rules
-from file_wayfinder.rules_ui import RulesDialog
-from file_wayfinder.settings_ui import SettingsDialog
-from file_wayfinder.tray import TrayIcon
-from file_wayfinder.watcher import FolderWatcher
+from iconic_filer.achievements import Achievements
+from iconic_filer.classifier import suggest_destinations
+from iconic_filer.config import Config
+from iconic_filer.conflict_ui import resolve_conflict
+from iconic_filer.constants import DEFAULT_UNSORTED_DIR
+from iconic_filer.dashboard_ui import show_batch_list, show_dashboard
+from iconic_filer.duplicate import find_duplicate
+from iconic_filer.history import History
+from iconic_filer.ipc import IPCServer
+from iconic_filer.notifications import notify
+from iconic_filer.prompt import SortPrompt, SetupWizard
+from iconic_filer.rules import Rules
+from iconic_filer.rules_ui import RulesDialog
+from iconic_filer.settings_ui import SettingsDialog
+from iconic_filer.tray import TrayIcon
+from iconic_filer.watcher import FolderWatcher
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,10 @@ class App:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._health_notified: set[str] = set()
+        # Serialise sort prompts: never show more than one at a time.
+        self._prompt_semaphore = threading.Semaphore(1)
+        # Active snooze timers so they can be cancelled on quit.
+        self._snooze_timers: list[threading.Timer] = []
 
         self.achievements = Achievements(
             os.path.join(os.path.dirname(self.config.path), "achievements.db")
@@ -170,7 +174,7 @@ class App:
                         folder, self._on_file_detected, whitelist,
                     )
 
-        logger.info("File Wayfinder is running.")
+        logger.info("Iconic File Filer is running.")
         self._ipc_server.start()
         self._update_tray_monitored_count()
         # Start background cleanup-reminder polling thread
@@ -197,7 +201,7 @@ class App:
         self.tray.set_monitored_count(count)
 
     def _handle_ipc_command(self, command: str) -> None:
-        """Handle a command sent by another File Wayfinder instance via IPC.
+        """Handle a command sent by another Iconic File Filer instance via IPC.
 
         Currently supported commands:
         ``ADD_FOLDER:<abs_path>`` — start watching the given folder, inheriting
@@ -227,6 +231,9 @@ class App:
     def _quit(self) -> None:
         logger.info("Shutting down...")
         self._stop_event.set()
+        for timer in self._snooze_timers:
+            timer.cancel()
+        self._snooze_timers.clear()
         self._ipc_server.stop()
         self.watcher.stop()
         self.history.close()
@@ -377,6 +384,7 @@ class App:
         )
 
         theme_name = self.config.get_setting("theme", "dark")
+        auto_accept_secs = self.config.get_setting("prompt_auto_accept_seconds", 0)
 
         # Capture for the closure — parent_monitored is already correctly resolved above.
         _pm = parent_monitored
@@ -384,15 +392,33 @@ class App:
         def _on_quick_add(folder_path: str) -> None:
             self._quick_add_folder(folder_path, _pm)
 
-        # Show prompt on the main thread via threading
+        def _on_save_destination(dest: str) -> None:
+            self._add_permanent_destination(_pm, dest)
+
+        _fp = filepath
+
+        def _on_snooze() -> None:
+            self._on_snooze_file(_fp)
+
+        # Show prompt serialised: acquire semaphore so only one prompt is
+        # visible at a time.  Other detections wait their turn.
         prompt = SortPrompt(
             filepath, ordered, self._on_prompt_done,
             theme=theme_name,
             on_whitelist=self.config.add_to_whitelist,
             on_quick_add=_on_quick_add,
             history=self.history,
+            on_snooze=_on_snooze,
+            on_save_destination=_on_save_destination,
+            always_rule_default=False,
+            auto_accept_seconds=auto_accept_secs,
         )
-        t = threading.Thread(target=prompt.show, daemon=True)
+
+        def _show_serialised() -> None:
+            with self._prompt_semaphore:
+                prompt.show()
+
+        t = threading.Thread(target=_show_serialised, daemon=True)
         t.start()
 
     def _on_prompt_done(
@@ -405,11 +431,39 @@ class App:
 
         self._move_file(filepath, destination)
 
+        _, ext = os.path.splitext(filepath)
+        ext_lower = ext.lower()
+
         if always:
-            _, ext = os.path.splitext(filepath)
-            if ext:
-                self.rules.set_rule(ext, destination)
-                logger.info("Auto-rule created: %s -> %s", ext, destination)
+            if ext_lower:
+                self.rules.set_rule(ext_lower, destination)
+                logger.info("Auto-rule created: %s -> %s", ext_lower, destination)
+        else:
+            # Auto-learn: silently create a rule once the user has manually
+            # sorted the same extension to the same destination N times.
+            threshold = self.config.get_setting("auto_learn_threshold", 3)
+            if threshold and ext_lower and ext_lower not in self.rules.extension_map:
+                dest_abs = os.path.abspath(destination)
+                count = sum(
+                    1 for s, d in self.history.all_moves()
+                    if os.path.splitext(s)[1].lower() == ext_lower
+                    and os.path.abspath(os.path.dirname(d)) == dest_abs
+                )
+                if count >= threshold:
+                    self.rules.set_rule(ext_lower, destination)
+                    fallback = self.config.get_setting(
+                        "notification_fallback", "log-only"
+                    )
+                    notify(
+                        "Auto-rule created",
+                        f"{ext_lower} files will now automatically go to "
+                        f"{os.path.basename(destination)}",
+                        fallback_strategy=fallback,
+                    )
+                    logger.info(
+                        "Auto-rule created after %d sorts: %s -> %s",
+                        count, ext_lower, destination,
+                    )
 
     # ------------------------------------------------------------------
     # File operations
@@ -520,7 +574,35 @@ class App:
     # Tray menu actions
     # ------------------------------------------------------------------
 
+    def _on_snooze_file(self, filepath: str) -> None:
+        """Re-queue *filepath* for prompting after the configured snooze delay."""
+        snooze = max(1, self.config.get_setting("snooze_minutes", 30))
+        delay = snooze * 60
 
+        def _requeue() -> None:
+            if os.path.exists(filepath):
+                self._on_file_detected(filepath)
+            else:
+                logger.debug("Snoozed file no longer exists: %s", filepath)
+
+        timer = threading.Timer(delay, _requeue)
+        timer.daemon = True
+        timer.start()
+        with self._lock:
+            self._snooze_timers.append(timer)
+        logger.info("Snoozed %s for %d minutes", filepath, snooze)
+
+    def _add_permanent_destination(
+        self, monitored_folder: str, dest: str
+    ) -> None:
+        """Permanently add *dest* as a destination for *monitored_folder*."""
+        current = list(self.config.get_folder_destinations(monitored_folder))
+        if dest not in current:
+            current.append(dest)
+            self.config.set_destinations(monitored_folder, current)
+            logger.info(
+                "Added permanent destination %s for %s", dest, monitored_folder
+            )
 
     def _add_folder_via_tray(self) -> None:
         """Handle 'Add folder to watch...' from the tray menu.
