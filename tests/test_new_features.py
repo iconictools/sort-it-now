@@ -547,6 +547,7 @@ class TestSortPromptWhitelist:
 
 
 class TestDestinationPicker:
+    @skip_no_tkinter
     def test_pick_destination_folders_multi_and_dedup(self, monkeypatch):
         from iconic_filer.prompt import pick_destination_folders
 
@@ -573,6 +574,7 @@ class TestDestinationPicker:
 
 
 class TestTrayMenuCallbacks:
+    @skip_no_display
     def test_tray_action_wrapper_accepts_pystray_args(self):
         from iconic_filer.tray import TrayIcon
 

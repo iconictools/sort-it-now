@@ -29,26 +29,44 @@ def pick_destination_folders(
     source_name = os.path.basename(source_folder) or source_folder
     destinations: list[str] = []
     while True:
-        dest = filedialog.askdirectory(
-            title=f"Choose destination for {source_name}",
-            parent=parent,
-        )
+        if parent is not None:
+            dest = filedialog.askdirectory(
+                title=f"Choose destination for {source_name}",
+                parent=parent,
+            )
+        else:
+            dest = filedialog.askdirectory(
+                title=f"Choose destination for {source_name}",
+            )
         if not dest:
             break
         dest = os.path.abspath(dest)
         if dest in destinations:
-            messagebox.showinfo(
-                "Already added",
-                f"This destination is already selected:\n{dest}",
+            if parent is not None:
+                messagebox.showinfo(
+                    "Already added",
+                    f"This destination is already selected:\n{dest}",
+                    parent=parent,
+                )
+            else:
+                messagebox.showinfo(
+                    "Already added",
+                    f"This destination is already selected:\n{dest}",
+                )
+        else:
+            destinations.append(dest)
+        if parent is not None:
+            add_more = messagebox.askyesno(
+                "Add another destination?",
+                "Do you want to add another destination folder?",
                 parent=parent,
             )
         else:
-            destinations.append(dest)
-        if not messagebox.askyesno(
-            "Add another destination?",
-            "Do you want to add another destination folder?",
-            parent=parent,
-        ):
+            add_more = messagebox.askyesno(
+                "Add another destination?",
+                "Do you want to add another destination folder?",
+            )
+        if not add_more:
             break
     return destinations
 

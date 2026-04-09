@@ -741,7 +741,7 @@ class App:
         else:
             # Open a destination picker
             import tkinter as tk
-            from tkinter import filedialog, messagebox
+            from tkinter import messagebox
 
             root = tk.Tk()
             root.withdraw()
@@ -894,4 +894,3 @@ class App:
             for filepath in queue:
                 if os.path.exists(filepath):
                     self._on_file_detected(filepath)
-
