@@ -46,7 +46,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     "global_settings": {
         # UI / behaviour
         "focus_mode": False,
-        # Minutes to snooze a file before re-prompting (0 = disabled)
+        # Minutes to snooze a file before re-prompting (default 30; set to 0 to disable)
         "snooze_minutes": 30,
         "batch_mode": False,
         "batch_mode_style": "one-by-one",
