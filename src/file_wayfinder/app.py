@@ -395,6 +395,11 @@ class App:
         def _on_save_destination(dest: str) -> None:
             self._add_permanent_destination(_pm, dest)
 
+        _fp = filepath
+
+        def _on_snooze() -> None:
+            self._on_snooze_file(_fp)
+
         # Show prompt serialised: acquire semaphore so only one prompt is
         # visible at a time.  Other detections wait their turn.
         prompt = SortPrompt(
@@ -403,7 +408,7 @@ class App:
             on_whitelist=self.config.add_to_whitelist,
             on_quick_add=_on_quick_add,
             history=self.history,
-            on_snooze=lambda fp=filepath: self._on_snooze_file(fp),
+            on_snooze=_on_snooze,
             on_save_destination=_on_save_destination,
             always_rule_default=False,
             auto_accept_seconds=auto_accept_secs,
