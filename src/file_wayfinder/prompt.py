@@ -291,30 +291,48 @@ class SortPrompt:
             self._dest_card(card_container, btn_idx, dest, False, t, _choose)
             btn_idx += 1
 
-        # ── "Other folder…" card ──────────────────────────────────────
-        def _new_folder() -> None:
+        # ── "Add new folder to list" card ─────────────────────────────
+        # Picks a folder, saves it permanently, then routes the file there.
+        if self._on_save_destination is not None:
+            _save_dest_cb = self._on_save_destination
+
+            def _add_and_send() -> None:
+                folder = filedialog.askdirectory(
+                    title="Choose folder to add to your list"
+                )
+                if not folder:
+                    return
+                _save_dest_cb(folder)
+                _choose(folder)
+
+            ctk.CTkButton(
+                card_container,
+                text="➕  Add new folder to my list",
+                height=44,
+                fg_color="transparent",
+                border_color=t["accent"],
+                border_width=1,
+                text_color=t["accent"],
+                hover_color=t["btn_bg"],
+                font=_font(11),
+                corner_radius=10,
+                anchor="w",
+                command=_add_and_send,
+            ).pack(fill="x", pady=(6, 3))
+
+        # ── "One-time send" card ───────────────────────────────────────
+        # Picks a folder and sends the file there — nothing is saved.
+        def _one_time_send() -> None:
             folder = filedialog.askdirectory(
-                title="Choose destination folder"
+                title="Choose destination (will not be saved)"
             )
             if not folder:
                 return
-            # Offer to save as a permanent destination
-            if self._on_save_destination is not None:
-                from tkinter import messagebox as _mb
-                save_it = _mb.askyesno(
-                    "Save as destination?",
-                    f"Add  '{os.path.basename(folder)}'  as a permanent\n"
-                    "destination for this watched folder?\n\n"
-                    "It will appear in the list for all future files.",
-                    parent=root,
-                )
-                if save_it:
-                    self._on_save_destination(folder)
             _choose(folder)
 
         ctk.CTkButton(
             card_container,
-            text="📂  Other folder…",
+            text="📁  Send to folder (one-time, not saved)",
             height=44,
             fg_color="transparent",
             border_color=t["muted"],
@@ -324,8 +342,8 @@ class SortPrompt:
             font=_font(11),
             corner_radius=10,
             anchor="w",
-            command=_new_folder,
-        ).pack(fill="x", pady=(6, 0))
+            command=_one_time_send,
+        ).pack(fill="x", pady=(0, 0))
 
         # ── Collapsible rename row ─────────────────────────────────────
         rename_var = tk.StringVar(value=basename)

@@ -69,9 +69,9 @@ class TestConfig:
         assert any("bak" in f for f in os.listdir(self._tmpdir))
 
     def test_auto_learn_threshold_default(self):
-        """Default auto-learn threshold should be 3 (Q5.1)."""
+        """Default auto-learn threshold should be 0 (disabled — opt-in)."""
         cfg = Config(self._path)
-        assert cfg.get_setting("auto_learn_threshold", 3) == 3
+        assert cfg.get_setting("auto_learn_threshold", 0) == 0
 
     def test_per_folder_schema(self):
         """Newly added folder should have all per-folder keys."""

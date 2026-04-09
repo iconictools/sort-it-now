@@ -87,8 +87,9 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         # Cleanup reminders: 0 = disabled, N = alert when folder has >= N files
         "cleanup_reminder_threshold": 0,
         # Auto-learn: automatically create an extension rule after this many
-        # manual sorts of the same extension to the same destination (0 = disabled)
-        "auto_learn_threshold": 3,
+        # manual sorts of the same extension to the same destination.
+        # Default is 0 (disabled) — rule building is opt-in via Settings.
+        "auto_learn_threshold": 0,
     },
     "ignore_patterns": [
         "~$*",
