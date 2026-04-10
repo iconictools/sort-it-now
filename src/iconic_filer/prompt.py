@@ -646,7 +646,7 @@ class SetupWizard:
         ).pack(pady=(0, 16))
         ctk.CTkLabel(
             root,
-            text="1) Add a watched folder   2) Pick one or more destinations   3) Finalize and run in tray",
+            text="1)Add a watched folder   2)Pick one or more destinations   3)Finalize and run in tray",
             font=_font(10),
             text_color=t["muted"],
         ).pack(pady=(0, 8))
@@ -748,7 +748,7 @@ class SetupWizard:
             messagebox.showinfo(
                 "You're all set",
                 "Iconic File Filer now runs in your system tray.\n\n"
-                "Use the tray icon to open Dashboard, Settings, and Rules.\n"
+                "Use the tray icon to open Activity & Queue, Settings, and Sorting Rules.\n"
                 "When files arrive in watched folders, sorting prompts will appear.",
             )
         return self.result
