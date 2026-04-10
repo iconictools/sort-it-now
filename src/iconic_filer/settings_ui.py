@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from iconic_filer.config import Config
 
 logger = logging.getLogger(__name__)
+SETTINGS_TABS = ("General", "Monitoring", "Folders", "Rules", "System")
 
 # ── Shared button helpers ─────────────────────────────────────────────
 
@@ -758,7 +759,7 @@ class SettingsDialog:
         tabview = ctk.CTkTabview(root, corner_radius=10)
         tabview.pack(fill="both", expand=True, padx=16, pady=(4, 4))
 
-        for tab_name in ("General", "Monitoring", "Folders", "Rules", "System"):
+        for tab_name in SETTINGS_TABS:
             tabview.add(tab_name)
 
         gen_vars = _build_general_tab(tabview, cfg, t)
@@ -772,7 +773,7 @@ class SettingsDialog:
             on_open_sorting_rules=self._on_open_sorting_rules,
         )
         sys_vars = _build_system_tab(tabview, cfg, t, root)
-        if self._initial_tab in ("General", "Monitoring", "Folders", "Rules", "System"):
+        if self._initial_tab in SETTINGS_TABS:
             tabview.set(self._initial_tab)
 
         # Save / Cancel

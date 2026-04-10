@@ -646,7 +646,7 @@ class SetupWizard:
         ).pack(pady=(0, 16))
         ctk.CTkLabel(
             root,
-            text="1) Add a watched folder   2) Pick one or more destinations   3) Finish and run in tray",
+            text="1) Add a watched folder   2) Pick one or more destinations   3) Finalize and run in tray",
             font=_font(10),
             text_color=t["muted"],
         ).pack(pady=(0, 8))
@@ -734,7 +734,7 @@ class SetupWizard:
         ).pack(side="left", padx=10)
         ctk.CTkButton(
             btn_frame,
-            text="Finish & Start Tray ✓",
+            text="Complete Setup & Start ✓",
             fg_color=t["btn_bg"],
             text_color=t["btn_fg"],
             hover_color=t["accent"],

@@ -107,7 +107,7 @@ class TrayIcon:
         self._icon: pystray.Icon | None = None
         self._pending = False
         self._pending_count = 0
-        self._focus_mode = False
+        self._prompts_paused = False
         self._monitored_count = 0
 
     @staticmethod
@@ -136,11 +136,11 @@ class TrayIcon:
             pystray.MenuItem(
                 lambda _: (
                     "Pause sorting prompts"
-                    if not self._focus_mode
+                    if not self._prompts_paused
                     else "Resume sorting prompts"
                 ),
                 self._action(self._on_focus),
-                checked=lambda _: self._focus_mode,
+                checked=lambda _: self._prompts_paused,
             ),
             pystray.MenuItem("Undo last move", self._action(self._on_undo)),
             pystray.Menu.SEPARATOR,
@@ -174,7 +174,7 @@ class TrayIcon:
 
     def set_focus_mode(self, enabled: bool) -> None:
         """Update the focus-mode checkmark state in the tray menu."""
-        self._focus_mode = enabled
+        self._prompts_paused = enabled
 
     def set_pending(self, pending: bool, count: int = 0) -> None:
         """Update the icon to reflect pending items with a badge count."""
