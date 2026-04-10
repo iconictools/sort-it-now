@@ -120,7 +120,7 @@ class TrayIcon:
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
             pystray.MenuItem(
-                "Add folder to watch...",
+                "Folder setup...",
                 self._action(self._on_add_folder),
             ),
             pystray.Menu.SEPARATOR,
@@ -134,15 +134,19 @@ class TrayIcon:
                 visible=lambda _: self._pending,
             ),
             pystray.MenuItem(
-                "Focus mode",
+                lambda _: (
+                    "Pause sorting prompts"
+                    if not self._focus_mode
+                    else "Resume sorting prompts"
+                ),
                 self._action(self._on_focus),
                 checked=lambda _: self._focus_mode,
             ),
             pystray.MenuItem("Undo last move", self._action(self._on_undo)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Dashboard", self._action(self._on_dashboard)),
+            pystray.MenuItem("Activity & Queue", self._action(self._on_dashboard)),
             pystray.MenuItem("Settings", self._action(self._on_settings)),
-            pystray.MenuItem("Manage Rules", self._action(self._on_rules)),
+            pystray.MenuItem("Sorting Rules...", self._action(self._on_rules)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", self._action(self._quit)),
         )

@@ -14,7 +14,7 @@ import logging
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import customtkinter as ctk
 
@@ -472,7 +472,13 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
     }
 
 
-def _build_rules_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.CTk) -> None:
+def _build_rules_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    root: ctk.CTk,
+    on_open_sorting_rules: Callable[[], None] | None = None,
+) -> None:
     f = tabview.tab("Rules")
 
     # Whitelist
@@ -628,6 +634,26 @@ def _build_rules_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.
     _btn(rp_btns, "- Remove", t, _rm_rp, "danger", width=80).pack(side="left", padx=(0, 4))
     _btn(rp_btns, "Enable/Disable", t, _toggle_rp, "normal", width=110).pack(side="left")
 
+    if on_open_sorting_rules is not None:
+        ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1).pack(fill="x", padx=8, pady=(10, 8))
+        sorting_rules_frame = ctk.CTkFrame(f, fg_color="transparent")
+        sorting_rules_frame.pack(fill="x", padx=8, pady=(0, 4))
+        _section_lbl(sorting_rules_frame, "Sorting Rules", t).pack(anchor="w")
+        _lbl(
+            sorting_rules_frame,
+            "Open the connected sorting-rules manager (extension and pattern destinations).",
+            t,
+            size=9,
+        ).pack(anchor="w", pady=(0, 4))
+        _btn(
+            sorting_rules_frame,
+            "Open Sorting Rules Manager",
+            t,
+            on_open_sorting_rules,
+            "accent",
+            width=210,
+        ).pack(anchor="w")
+
 
 def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.CTk) -> dict:
     f = tabview.tab("System")
@@ -694,10 +720,17 @@ def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk
 class SettingsDialog:
     """Tabbed modal settings window."""
 
-    def __init__(self, config: "Config") -> None:
+    def __init__(
+        self,
+        config: "Config",
+        initial_tab: str = "General",
+        on_open_sorting_rules: Callable[[], None] | None = None,
+    ) -> None:
         self._config = config
         self._theme_name = config.get_setting("theme", "dark")
         self._theme = get_theme(self._theme_name)
+        self._initial_tab = initial_tab
+        self._on_open_sorting_rules = on_open_sorting_rules
 
     def show(self) -> None:
         """Display the settings dialog (blocks until closed)."""
@@ -731,8 +764,16 @@ class SettingsDialog:
         gen_vars = _build_general_tab(tabview, cfg, t)
         mon_vars = _build_monitoring_tab(tabview, cfg, t)
         folders_vars = _build_folders_tab(tabview, cfg, t, root)
-        _build_rules_tab(tabview, cfg, t, root)
+        _build_rules_tab(
+            tabview,
+            cfg,
+            t,
+            root,
+            on_open_sorting_rules=self._on_open_sorting_rules,
+        )
         sys_vars = _build_system_tab(tabview, cfg, t, root)
+        if self._initial_tab in ("General", "Monitoring", "Folders", "Rules", "System"):
+            tabview.set(self._initial_tab)
 
         # Save / Cancel
         def _save() -> None:

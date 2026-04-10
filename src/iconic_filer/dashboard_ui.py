@@ -33,18 +33,18 @@ def show_dashboard(
     watcher: Any,
     theme_name: str,
 ) -> None:
-    """Open the enhanced dashboard window (blocks until closed)."""
+    """Open the activity window (blocks until closed)."""
     theme = get_theme(theme_name)
     apply_ctk_appearance(theme_name)
 
     root = ctk.CTk()
-    root.title("Iconic File Filer — Dashboard")
+    root.title("Iconic File Filer — Activity")
     root.geometry("600x680")
 
     # ── Header ────────────────────────────────────────────────────────
     ctk.CTkLabel(
         root,
-        text="📊 Dashboard",
+        text="📊 Activity & Queue",
         font=ctk.CTkFont(size=18, weight="bold"),
         text_color=theme["accent"],
     ).pack(pady=(20, 4))

@@ -109,7 +109,7 @@ class RulesDialog:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("Iconic File Filer — Rules")
+        root.title("Iconic File Filer — Sorting Rules")
         root.resizable(True, True)
 
         w, h = 580, 680
@@ -117,6 +117,9 @@ class RulesDialog:
         sy = max(40, root.winfo_screenheight() // 2 - h // 2)
         root.geometry(f"{w}x{h}+{sx}+{sy}")
         root.minsize(480, 500)
+        root.attributes("-topmost", True)
+        root.lift()
+        root.after(300, lambda: root.attributes("-topmost", False))
 
         # ── Header ────────────────────────────────────────────────────
         header = ctk.CTkFrame(root, fg_color="transparent")
@@ -134,7 +137,7 @@ class RulesDialog:
 
         ctk.CTkLabel(
             htext,
-            text="Rules Manager",
+            text="Sorting Rules Manager",
             font=_font(16, "bold"),
             text_color=t["accent"],
             anchor="w",

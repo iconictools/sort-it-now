@@ -587,3 +587,32 @@ class TestTrayMenuCallbacks:
 
         wrapped(None, None)
         assert called["count"] == 1
+
+    @skip_no_display
+    def test_tray_menu_uses_updated_labels(self):
+        from iconic_filer.tray import TrayIcon
+
+        tray = TrayIcon()
+        menu = tray._build_menu()
+        labels: list[str] = []
+        for item in menu.items:
+            if getattr(item, "text", None) is None:
+                continue
+            text = item.text(None) if callable(item.text) else item.text
+            labels.append(text)
+
+        assert "Folder setup..." in labels
+        assert "Activity & Queue" in labels
+        assert "Sorting Rules..." in labels
+
+
+class TestSettingsDialogInit:
+    @skip_no_tkinter
+    def test_settings_dialog_accepts_initial_tab(self):
+        from iconic_filer.config import Config
+        from iconic_filer.settings_ui import SettingsDialog
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(os.path.join(tmpdir, "config.json"))
+            dlg = SettingsDialog(cfg, initial_tab="Folders")
+            assert dlg._initial_tab == "Folders"

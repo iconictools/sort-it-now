@@ -116,7 +116,7 @@ class App:
             on_undo=self._undo_last,
             on_open_settings=self._show_settings,
             on_open_rules=self._show_rules,
-            on_add_folder=self._add_folder_via_tray,
+            on_add_folder=self._show_folder_setup,
             on_process_pending=self._process_batch_queue,
             on_quit=self._quit,
         )
@@ -843,7 +843,22 @@ class App:
     def _show_settings(self) -> None:
         """Open the settings dialog."""
         t = threading.Thread(
-            target=lambda: SettingsDialog(self.config).show(),
+            target=lambda: SettingsDialog(
+                self.config,
+                on_open_sorting_rules=self._show_rules,
+            ).show(),
+            daemon=True,
+        )
+        t.start()
+
+    def _show_folder_setup(self) -> None:
+        """Open folder setup (watched folders + destinations split view)."""
+        t = threading.Thread(
+            target=lambda: SettingsDialog(
+                self.config,
+                initial_tab="Folders",
+                on_open_sorting_rules=self._show_rules,
+            ).show(),
             daemon=True,
         )
         t.start()
@@ -857,7 +872,7 @@ class App:
         t.start()
 
     def _show_dashboard(self) -> None:
-        """Open the enhanced dashboard window."""
+        """Open the activity window."""
         theme_name = self.config.get_setting("theme", "dark")
         t = threading.Thread(
             target=show_dashboard,
