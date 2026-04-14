@@ -173,6 +173,13 @@ class RulesDialog:
             text_color=t["muted"],
             anchor="w",
         ).pack(anchor="w", pady=(4, 8))
+        ctk.CTkLabel(
+            ext_tab,
+            text="Example: .pdf → ~/Documents/Invoices",
+            font=_font(9),
+            text_color=t["muted"],
+            anchor="w",
+        ).pack(anchor="w", pady=(0, 8))
 
         # Rule cards
         ext_scroll = ctk.CTkScrollableFrame(
@@ -275,6 +282,13 @@ class RulesDialog:
             text_color=t["muted"],
             anchor="w",
         ).pack(anchor="w", pady=(4, 8))
+        ctk.CTkLabel(
+            pat_tab,
+            text="Regex example: ^INV-\\d{4}.*\\.pdf$",
+            font=_font(9),
+            text_color=t["muted"],
+            anchor="w",
+        ).pack(anchor="w", pady=(0, 8))
 
         pat_scroll = ctk.CTkScrollableFrame(
             pat_tab, fg_color="transparent", height=260

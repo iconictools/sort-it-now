@@ -42,6 +42,11 @@ def show_manual(theme_name: str = "dark") -> None:
 
     sections = [
         (
+            "First 2 minutes (quick start)",
+            "1) Tray → Folder setup...  2) Add a watched folder  3) Add one or more destinations  "
+            "4) Drop a test file into the watched folder and choose a destination in the prompt.",
+        ),
+        (
             "1) Folder setup",
             "Use Tray → Folder setup... to configure watched folders on the left and destination folders on the right.",
         ),

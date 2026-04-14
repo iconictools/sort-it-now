@@ -915,6 +915,8 @@ class App:
                 self.config,
                 on_open_sorting_rules=self._show_rules,
                 on_rescan=self._trigger_rescan,
+                on_folder_added=self._on_settings_folder_added,
+                on_folder_removed=self._on_settings_folder_removed,
             ).show(),
             daemon=True,
         )
@@ -937,10 +939,28 @@ class App:
                 initial_tab="Folders",
                 on_open_sorting_rules=self._show_rules,
                 on_rescan=self._trigger_rescan,
+                on_folder_added=self._on_settings_folder_added,
+                on_folder_removed=self._on_settings_folder_removed,
             ).show(),
             daemon=True,
         )
         t.start()
+
+    def _on_settings_folder_added(self, folder: str) -> None:
+        """Keep watcher and tray state in sync when Settings adds a watched folder."""
+        try:
+            self.watcher.add_folder(folder)
+        except Exception as exc:
+            logger.error("Cannot watch %s: %s", folder, exc)
+        self._update_tray_monitored_count()
+
+    def _on_settings_folder_removed(self, folder: str) -> None:
+        """Keep watcher and tray state in sync when Settings removes a watched folder."""
+        try:
+            self.watcher.remove_folder(folder)
+        except Exception as exc:
+            logger.error("Cannot stop watching %s: %s", folder, exc)
+        self._update_tray_monitored_count()
 
     def _show_rules(self) -> None:
         """Open the rule management dialog."""

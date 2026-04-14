@@ -60,6 +60,12 @@ def show_dashboard(
             font=ctk.CTkFont(size=11),
             text_color=theme["danger"],
         ).pack(pady=4)
+        ctk.CTkLabel(
+            root,
+            text="Next step: use the tray menu and click “Sort pending files”.",
+            font=ctk.CTkFont(size=10),
+            text_color=theme["muted"],
+        ).pack(pady=(0, 4))
 
     if on_rescan is not None:
         actions = ctk.CTkFrame(root, fg_color="transparent")
