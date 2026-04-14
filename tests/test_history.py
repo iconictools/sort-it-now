@@ -105,3 +105,16 @@ class TestHistory:
         ).fetchone()
         assert row is not None and row[0] == 0
         hist.close()
+
+    def test_undo_last_missing_destination_returns_none_and_keeps_pending(self):
+        hist = History(self._db_path)
+        src = os.path.join(self._tmpdir, "missing-source.txt")
+        dst = os.path.join(self._tmpdir, "missing-dest.txt")
+        action_id = hist.record(src, dst)
+        assert hist.undo_last() is None
+        row = hist._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        hist.close()

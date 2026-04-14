@@ -157,6 +157,19 @@ class TestHistoryExtensions:
         assert row is not None and row[0] == 0
         h.close()
 
+    def test_undo_by_id_missing_destination_returns_none_and_not_undone(self):
+        h = History(self._db)
+        src = os.path.join(self._tmpdir, "src-missing.txt")
+        dst = os.path.join(self._tmpdir, "dst-missing.txt")
+        action_id = h.record(src, dst)
+        assert h.undo_by_id(action_id) is None
+        row = h._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        h.close()
+
 
 class TestAutostart:
     """Tests for autostart module (platform-independent logic)."""
