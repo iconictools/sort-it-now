@@ -228,15 +228,17 @@ class App:
         """
         if command.startswith("ADD_FOLDER:"):
             folder = command[len("ADD_FOLDER:"):]
-            if not folder or folder in self.config.monitored_folders:
+            if not folder:
+                return
+            folder = os.path.abspath(folder)
+            if folder in self.config.monitored_folders:
                 return
             # Find a parent folder to inherit destinations from (proper path containment)
-            folder_abs = os.path.abspath(folder)
             parent_monitored = next(
                 (
                     mf for mf in self.config.monitored_folders
-                    if folder_abs == os.path.abspath(mf)
-                    or folder_abs.startswith(os.path.abspath(mf) + os.sep)
+                    if folder == os.path.abspath(mf)
+                    or folder.startswith(os.path.abspath(mf) + os.sep)
                 ),
                 next(iter(self.config.monitored_folders), ""),
             )
@@ -328,7 +330,8 @@ class App:
         parent = os.path.dirname(os.path.abspath(filepath))
         for folder_cfg in self.config.monitored_folders.values():
             for dest in folder_cfg.get("destinations", []):
-                if os.path.abspath(dest) == parent:
+                dest_abs = os.path.abspath(dest)
+                if parent == dest_abs or parent.startswith(dest_abs + os.sep):
                     logger.debug(
                         "In destination folder, skipping: %s", filepath,
                     )
@@ -429,7 +432,7 @@ class App:
             history=self.history,
             on_snooze=_on_snooze,
             on_save_destination=_on_save_destination,
-            always_rule_default=False,
+            always_rule_default=self.config.get_setting("prompt_always_rule", False),
             auto_accept_seconds=auto_accept_secs,
         )
 
@@ -1008,3 +1011,5 @@ class App:
             for filepath in queue:
                 if os.path.exists(filepath):
                     self._on_file_detected(filepath)
+                else:
+                    logger.info("Skipped queued item that no longer exists: %s", filepath)

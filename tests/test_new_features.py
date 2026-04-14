@@ -136,6 +136,27 @@ class TestHistoryExtensions:
         assert h.undo_by_id(9999) is None
         h.close()
 
+    def test_undo_by_id_move_error_returns_none_and_not_undone(self, monkeypatch):
+        h = History(self._db)
+        src = os.path.join(self._tmpdir, "src-fail.txt")
+        dst = os.path.join(self._tmpdir, "dst-fail.txt")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write("x")
+        shutil.move(src, dst)
+        action_id = h.record(src, dst)
+
+        def _raise_move(_src, _dst):
+            raise OSError("simulated move failure")
+
+        monkeypatch.setattr(shutil, "move", _raise_move)
+        assert h.undo_by_id(action_id) is None
+        row = h._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        h.close()
+
 
 class TestAutostart:
     """Tests for autostart module (platform-independent logic)."""
