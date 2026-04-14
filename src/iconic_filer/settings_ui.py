@@ -510,7 +510,12 @@ def _build_folders_tab(
             on_folder_added(folder)
         watch_list.insert("end", folder)
         _refresh_empty_state()
-        messagebox.showinfo("Watched folder added", f"Now watching:\n{folder}", parent=root)
+        dest_msg = (
+            f"Now watching:\n{folder}\n\nInitial destinations: {len(initial_dests)}"
+            if initial_dests
+            else f"Now watching:\n{folder}\n\nNo destinations yet (you can add them anytime)."
+        )
+        messagebox.showinfo("Watched folder added", dest_msg, parent=root)
 
     def _remove_watch() -> None:
         sel = watch_list.curselection()
