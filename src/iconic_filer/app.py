@@ -30,6 +30,9 @@ from iconic_filer.tray import TrayIcon
 from iconic_filer.watcher import FolderWatcher
 
 logger = logging.getLogger(__name__)
+MIN_BATCH_WINDOW_DELAY_SECONDS = 0.2
+DELETE_USER_DATA_MAX_RETRIES = 3
+DELETE_RETRY_DELAY_SECONDS = 0.2
 
 
 def _is_dnd_active() -> bool:
@@ -657,7 +660,10 @@ class App:
                 return
             if self._batch_open_timer is not None and self._batch_open_timer.is_alive():
                 return
-            delay = max(0.2, float(self.config.get_setting("prompt_delay_seconds", 1.0)))
+            delay = max(
+                MIN_BATCH_WINDOW_DELAY_SECONDS,
+                float(self.config.get_setting("prompt_delay_seconds", 1.0)),
+            )
             timer = threading.Timer(delay, self._open_batch_window)
             timer.daemon = True
             self._batch_open_timer = timer
@@ -1121,18 +1127,19 @@ class App:
 
         config_dir = os.path.dirname(self.config.path)
         if os.path.isdir(config_dir):
-            for attempt in range(1, 4):
+            for attempt in range(1, DELETE_USER_DATA_MAX_RETRIES + 1):
                 try:
                     shutil.rmtree(config_dir)
                     break
                 except OSError as exc:
                     logger.warning(
-                        "Delete-all-user-data retry %d/3 failed for %s: %s",
+                        "Delete-all-user-data retry %d/%d failed for %s: %s",
                         attempt,
+                        DELETE_USER_DATA_MAX_RETRIES,
                         config_dir,
                         exc,
                     )
-                    time.sleep(0.2)
+                    time.sleep(DELETE_RETRY_DELAY_SECONDS)
             if os.path.isdir(config_dir):
                 logger.error("Delete-all-user-data failed; directory still exists: %s", config_dir)
 

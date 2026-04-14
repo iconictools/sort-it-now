@@ -6,6 +6,8 @@ import customtkinter as ctk
 
 from iconic_filer.themes import apply_ctk_appearance, get_theme
 
+STARTUP_INDICATOR_DISPLAY_MS = 1200
+
 
 def _font(size: int = 12, weight: str = "normal") -> ctk.CTkFont:
     return ctk.CTkFont(size=size, weight=weight)
@@ -51,7 +53,7 @@ def show_startup_indicator(theme_name: str = "dark", monitored_count: int = 0) -
     progress.pack(pady=(0, 14))
     progress.set(1.0)
 
-    root.after(1200, root.destroy)
+    root.after(STARTUP_INDICATOR_DISPLAY_MS, root.destroy)
     root.mainloop()
 
 

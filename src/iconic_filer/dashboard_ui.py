@@ -355,7 +355,10 @@ def show_batch_list(
 
     ctk.CTkLabel(
         root,
-        text=f"Detected files: {len(queue)} pending action(s)",
+        text=(
+            f"Detected files: {len(queue)} pending "
+            f"{'action' if len(queue) == 1 else 'actions'}"
+        ),
         font=ctk.CTkFont(size=16, weight="bold"),
         text_color=theme["accent"],
     ).pack(pady=(20, 10))
