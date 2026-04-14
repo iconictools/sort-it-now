@@ -409,7 +409,7 @@ def _build_folders_tab(
             return
         try:
             if sys.platform == "win32":
-                # Windows-only API guarded by platform check.
+                # Windows-specific function guarded by platform check.
                 os.startfile(path)  # type: ignore[attr-defined]
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", path])
@@ -511,11 +511,11 @@ def _build_folders_tab(
             on_folder_added(folder)
         watch_list.insert("end", folder)
         _refresh_empty_state()
-        dest_msg = (
-            f"Now watching:\n{folder}\n\nInitial destinations: {len(initial_dests)}"
-            if initial_dests
-            else f"Now watching:\n{folder}\n\nNo destinations yet (you can add them anytime)."
-        )
+        dest_msg = f"Now watching:\n{folder}\n\n"
+        if initial_dests:
+            dest_msg += f"Initial destinations: {len(initial_dests)}"
+        else:
+            dest_msg += "No destinations yet (you can add them anytime)."
         messagebox.showinfo("Watched folder added", dest_msg, parent=root)
 
     def _remove_watch() -> None:
