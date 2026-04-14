@@ -73,6 +73,11 @@ class TestConfig:
         cfg = Config(self._path)
         assert cfg.get_setting("auto_learn_threshold", 0) == 0
 
+    def test_batch_mode_style_default(self):
+        """Default batch mode style should use grouped batch-list flow."""
+        cfg = Config(self._path)
+        assert cfg.get_setting("batch_mode_style") == "batch-list"
+
     def test_per_folder_schema(self):
         """Newly added folder should have all per-folder keys."""
         cfg = Config(self._path)

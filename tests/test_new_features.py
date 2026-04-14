@@ -246,6 +246,7 @@ class TestModuleImports:
     def test_import_manual_ui(self):
         import iconic_filer.manual_ui
         assert hasattr(iconic_filer.manual_ui, "show_manual")
+        assert hasattr(iconic_filer.manual_ui, "show_startup_indicator")
 
 
 class TestDashboardUI:

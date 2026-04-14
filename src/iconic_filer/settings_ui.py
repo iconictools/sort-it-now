@@ -873,7 +873,13 @@ def _build_rules_tab(
         ).pack(anchor="w")
 
 
-def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.CTk) -> dict:
+def _build_system_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    root: ctk.CTk,
+    on_delete_user_data: Callable[[], None] | None = None,
+) -> dict:
     f = tabview.tab("System")
     row = 0
 
@@ -926,6 +932,45 @@ def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk
     _btn(io_frame, "Export Config…", t, _export, "normal").pack(side="left", padx=(0, 6))
     _btn(io_frame, "Import Config…", t, _import, "normal").pack(side="left")
 
+    if on_delete_user_data is not None:
+        _section_lbl(f, "Danger Zone", t).grid(
+            row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(14, 4)
+        )
+        row += 1
+        _lbl(
+            f,
+            "Delete all user data (watched folders config, rules, history, achievements, logs).",
+            t,
+            size=9,
+        ).grid(row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 3))
+        row += 1
+
+        def _delete_all_data() -> None:
+            if not messagebox.askyesno(
+                "Delete all user data?",
+                "This will permanently delete all Iconic File Filer user data.\n\nContinue?",
+                parent=root,
+            ):
+                return
+            if not messagebox.askyesno(
+                "Final confirmation",
+                "This cannot be undone. Delete all user data now and quit the app?",
+                parent=root,
+            ):
+                return
+            on_delete_user_data()
+            root.destroy()
+
+        _btn(
+            f,
+            "Delete all user data…",
+            t,
+            _delete_all_data,
+            "danger",
+            width=200,
+        ).grid(row=row, column=0, sticky="w", padx=8, pady=(0, 6))
+        row += 1
+
     f.grid_columnconfigure(1, weight=1)
     return {
         "autostart": autostart_var,
@@ -946,6 +991,7 @@ class SettingsDialog:
         on_rescan: Callable[[], None] | None = None,
         on_folder_added: Callable[[str], None] | None = None,
         on_folder_removed: Callable[[str], None] | None = None,
+        on_delete_user_data: Callable[[], None] | None = None,
     ) -> None:
         self._config = config
         self._theme_name = config.get_setting("theme", "dark")
@@ -955,6 +1001,7 @@ class SettingsDialog:
         self._on_rescan = on_rescan
         self._on_folder_added = on_folder_added
         self._on_folder_removed = on_folder_removed
+        self._on_delete_user_data = on_delete_user_data
 
     def show(self) -> None:
         """Display the settings dialog (blocks until closed)."""
@@ -1007,7 +1054,13 @@ class SettingsDialog:
             root,
             on_open_sorting_rules=self._on_open_sorting_rules,
         )
-        sys_vars = _build_system_tab(tabview, cfg, t, root)
+        sys_vars = _build_system_tab(
+            tabview,
+            cfg,
+            t,
+            root,
+            on_delete_user_data=self._on_delete_user_data,
+        )
         if self._initial_tab in SETTINGS_TABS:
             tabview.set(self._initial_tab)
 

@@ -11,6 +11,50 @@ def _font(size: int = 12, weight: str = "normal") -> ctk.CTkFont:
     return ctk.CTkFont(size=size, weight=weight)
 
 
+def show_startup_indicator(theme_name: str = "dark", monitored_count: int = 0) -> None:
+    """Show a brief startup window so launch is never tray-only."""
+    t = get_theme(theme_name)
+    apply_ctk_appearance(theme_name)
+
+    root = ctk.CTk()
+    root.title("Iconic File Filer — Starting")
+    root.geometry("460x210")
+    root.resizable(False, False)
+    root.attributes("-topmost", True)
+
+    ctk.CTkLabel(
+        root,
+        text="🚀 Iconic File Filer is starting",
+        font=_font(18, "bold"),
+        text_color=t["accent"],
+    ).pack(pady=(24, 8))
+
+    ctk.CTkLabel(
+        root,
+        text=(
+            f"Preparing {monitored_count} watched folder{'s' if monitored_count != 1 else ''}."
+            if monitored_count
+            else "Preparing your tray and monitoring engine."
+        ),
+        font=_font(11),
+        text_color=t["btn_fg"],
+    ).pack(pady=(0, 6))
+    ctk.CTkLabel(
+        root,
+        text="You can open Settings and Manual from the tray menu at any time.",
+        font=_font(10),
+        text_color=t["muted"],
+        wraplength=420,
+    ).pack(pady=(0, 10))
+
+    progress = ctk.CTkProgressBar(root, width=320)
+    progress.pack(pady=(0, 14))
+    progress.set(1.0)
+
+    root.after(1200, root.destroy)
+    root.mainloop()
+
+
 def show_manual(theme_name: str = "dark") -> None:
     """Show a compact in-app manual."""
     t = get_theme(theme_name)

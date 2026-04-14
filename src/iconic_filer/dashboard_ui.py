@@ -341,6 +341,9 @@ def show_batch_list(
     queue: list[str],
     theme_name: str,
     move_file_fn: Callable[[str, str], None],
+    on_whitelist: Callable[[str], None] | None = None,
+    on_snooze: Callable[[str], None] | None = None,
+    on_defer: Callable[[list[str]], None] | None = None,
 ) -> None:
     """Show a batch processing window listing all pending files."""
     theme = get_theme(theme_name)
@@ -352,15 +355,16 @@ def show_batch_list(
 
     ctk.CTkLabel(
         root,
-        text=f"Batch: {len(queue)} file(s) pending",
+        text=f"Detected files: {len(queue)} pending action(s)",
         font=ctk.CTkFont(size=16, weight="bold"),
         text_color=theme["accent"],
     ).pack(pady=(20, 10))
 
-    scroll = ctk.CTkScrollableFrame(root, height=320)
+    scroll = ctk.CTkScrollableFrame(root, height=330)
     scroll.pack(fill="x", padx=24, pady=4)
     scroll.grid_columnconfigure(0, weight=3)
     scroll.grid_columnconfigure(1, weight=2)
+    scroll.grid_columnconfigure(2, weight=1)
 
     all_dests: list[str] = []
     for folder in config.monitored_folders:
@@ -375,16 +379,36 @@ def show_batch_list(
             text_color=theme["danger"],
         ).pack(pady=8)
 
-    dest_vars: list[tuple[str, tk.StringVar]] = []
+    ctk.CTkLabel(
+        scroll,
+        text="File",
+        text_color=theme["muted"],
+        anchor="w",
+    ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+    ctk.CTkLabel(
+        scroll,
+        text="Destination",
+        text_color=theme["muted"],
+        anchor="w",
+    ).grid(row=0, column=1, sticky="w", pady=(0, 4))
+    ctk.CTkLabel(
+        scroll,
+        text="Action",
+        text_color=theme["muted"],
+        anchor="w",
+    ).grid(row=0, column=2, sticky="w", pady=(0, 4))
+
+    rows: list[tuple[str, tk.StringVar, tk.StringVar]] = []
     for row_idx, filepath in enumerate(queue):
         if not os.path.exists(filepath):
             continue
+        ui_row = row_idx + 1
         ctk.CTkLabel(
             scroll,
             text=os.path.basename(filepath),
             font=ctk.CTkFont(size=10),
             anchor="w",
-        ).grid(row=row_idx, column=0, sticky="ew", pady=3, padx=(4, 8))
+        ).grid(row=ui_row, column=0, sticky="ew", pady=3, padx=(4, 8))
 
         dest_var = tk.StringVar(value=all_dests[0] if all_dests else "")
         if all_dests:
@@ -393,34 +417,80 @@ def show_batch_list(
                 variable=dest_var,
                 values=all_dests,
                 font=ctk.CTkFont(size=10),
-            ).grid(row=row_idx, column=1, sticky="ew", pady=3)
-        dest_vars.append((filepath, dest_var))
+            ).grid(row=ui_row, column=1, sticky="ew", pady=3)
+        else:
+            ctk.CTkLabel(
+                scroll,
+                text="(none)",
+                text_color=theme["muted"],
+            ).grid(row=ui_row, column=1, sticky="w", pady=3)
 
-    def _process_all() -> None:
-        for filepath, var in dest_vars:
-            dest = var.get()
-            if dest and os.path.exists(filepath):
-                move_file_fn(filepath, dest)
-                rules.record_action(filepath, dest)
+        action_var = tk.StringVar(value="Move")
+        ctk.CTkOptionMenu(
+            scroll,
+            variable=action_var,
+            values=["Move", "Skip", "Whitelist", "Snooze"],
+            font=ctk.CTkFont(size=10),
+            width=110,
+        ).grid(row=ui_row, column=2, sticky="ew", pady=3, padx=(8, 0))
+        rows.append((filepath, dest_var, action_var))
+
+    moved = [0]
+    whitelisted = [0]
+    snoozed = [0]
+    skipped = [0]
+
+    def _apply_actions() -> None:
+        for filepath, dest_var, action_var in rows:
+            if not os.path.exists(filepath):
+                continue
+            action = action_var.get()
+            if action == "Move":
+                dest = dest_var.get()
+                if dest:
+                    move_file_fn(filepath, dest)
+                    rules.record_action(filepath, dest)
+                    moved[0] += 1
+                else:
+                    skipped[0] += 1
+            elif action == "Whitelist":
+                if on_whitelist is not None:
+                    on_whitelist(os.path.basename(filepath))
+                whitelisted[0] += 1
+            elif action == "Snooze":
+                if on_snooze is not None:
+                    on_snooze(filepath)
+                snoozed[0] += 1
+            else:
+                skipped[0] += 1
+        logger.info(
+            "Batch applied: moved=%d, whitelisted=%d, snoozed=%d, skipped=%d",
+            moved[0], whitelisted[0], snoozed[0], skipped[0],
+        )
+        root.destroy()
+
+    def _later() -> None:
+        if on_defer is not None:
+            on_defer([path for path, _, _ in rows if os.path.exists(path)])
         root.destroy()
 
     btn_frame = ctk.CTkFrame(root, fg_color="transparent")
     btn_frame.pack(pady=12)
     ctk.CTkButton(
-        btn_frame, text="Move All",
+        btn_frame, text="Apply actions",
         fg_color=theme["accent"], text_color="#1e1e2e",
         hover_color=theme["btn_active"],
         font=ctk.CTkFont(size=11, weight="bold"),
         corner_radius=8,
-        command=_process_all,
+        command=_apply_actions,
     ).pack(side="left", padx=6)
     ctk.CTkButton(
-        btn_frame, text="Cancel",
+        btn_frame, text="Later",
         fg_color=theme["btn_bg"], text_color=theme["btn_fg"],
         hover_color=theme["muted"],
         font=ctk.CTkFont(size=11),
         corner_radius=8,
-        command=root.destroy,
+        command=_later,
     ).pack(side="left", padx=6)
 
     root.mainloop()

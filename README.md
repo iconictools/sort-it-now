@@ -29,12 +29,13 @@ Every other file-watching tool eventually starts sorting files automatically (au
 | **Rename on move** | Configurable rename patterns with `{name}`, `{date}`, `{ext}` tokens |
 | **Duplicate detection** | SHA256-based duplicate check before moving |
 | **Native notifications** | Toast notifications via plyer (cross-platform) |
+| **Startup indicator window** | Every launch shows a visible startup window before tray mode begins |
 | **Focus / Snooze mode** | Queues prompts during deep work, processes them when you're ready |
 | **DND integration** | Pauses when Windows Focus Assist is active |
 | **Undo** | One-click revert from the tray menu, plus clickable history |
 | **Dashboard** | Quick view of recent actions, stats, and pending files |
-| **Batch processing** | Process queued files one-by-one or via batch list |
-| **Settings UI** | Full tabbed settings dialog — no JSON editing required |
+| **Batch processing** | Single batch window for newly detected files (move / skip / whitelist / snooze) |
+| **Settings UI** | Full tabbed settings dialog with watched-folder + destination add/remove management |
 | **Rule management UI** | View, add, edit, and delete explicit rules visually |
 | **Dark / Light theme** | Catppuccin-inspired themes via customtkinter — beautiful rounded widgets |
 | **Polished UI** | Modern, rounded dialogs (customtkinter) on all platforms — Windows, macOS, Linux |
@@ -42,6 +43,7 @@ Every other file-watching tool eventually starts sorting files automatically (au
 | **Catch folders** | Optionally detect and sort entire directories |
 | **Quick Add** | Instantly start monitoring a new sub-folder from the sort prompt |
 | **Config import/export** | Backup and restore your setup as a zip |
+| **Delete all user data** | One-click destructive reset from Settings → System → Danger Zone |
 | **Autostart** | Start on login (Windows registry, Linux XDG autostart, macOS LaunchAgent) |
 | **AppImage** | Full-featured AppImage for Linux — no installation required |
 | **Cross-platform** | Works on Windows, macOS, and Linux |
@@ -137,7 +139,7 @@ Config is stored in `~/.iconic-filer/config.json`. Example:
     "catch_folders": false,
     "pattern_rules_enabled": true,
     "pause_on_dnd": false,
-    "batch_mode_style": "one-by-one"
+    "batch_mode_style": "batch-list"
   },
   "ignore_patterns": [
     "~$*",
@@ -191,6 +193,12 @@ python -m iconic_filer -v
 ruff check src/ tests/
 ```
 
+### Feature validation checklist (Linux + Windows)
+
+- **Linux local run**: `pytest --tb=short -q`, `ruff check src/ tests/`, `mypy src/ --ignore-missing-imports`
+- **Windows run**: execute the same test/lint/type-check commands in PowerShell (or via CI)
+- **CI expectation**: Linux and Windows build/test jobs must pass before release
+
 ## License
 
 MIT
@@ -201,16 +209,11 @@ MIT
 
 ### Getting Started
 
-1. **First launch — Setup Wizard**  
-   On the very first run, the Setup Wizard opens and asks you to choose one or more folders to watch (e.g. `Downloads`) and one or more destination folders for each watched folder (e.g. `Documents`, `Pictures`, `Work`). You can add more folders at any time from the tray menu or **Settings → Folders**.
+1. **Startup flow + first launch setup**  
+   Every app launch shows a short startup window (so startup is never tray-only). On the very first run, the Setup Wizard opens and asks you to choose one or more folders to watch (e.g. `Downloads`) and one or more destination folders for each watched folder (e.g. `Documents`, `Pictures`, `Work`). You can add/remove folders at any time from **Settings → Folders**.
 
-2. **The sort prompt**  
-   Whenever a new file lands in a watched folder, a non-intrusive popup appears showing the file name, size, and a preview (image thumbnail, text snippet, or type label). You can:
-   - Click a destination button to move the file there immediately.
-   - Edit the **✎ Rename:** field to give the file a new name before moving it (the stem is pre-selected on focus so you can start typing right away).
-   - Tick **Always send `<ext>` files here** to create an auto-rule for that extension.
-   - Click **Add to whitelist** to permanently ignore this file.
-   - Click **Ignore** to dismiss without moving.
+2. **Detected files action window**  
+   Newly detected files are grouped into a single batch window instead of spawning one popup per file. For each file you can choose: **Move**, **Skip**, **Whitelist**, or **Snooze**.
 
 3. **Focus mode**  
    Focus mode queues all incoming files instead of showing prompts. The tray icon turns red and displays a badge with the pending count. Toggle focus mode from the tray context menu. When you turn it off the queue is processed according to the **batch mode style** setting (one-by-one or batch list).
@@ -232,9 +235,9 @@ MIT
    The settings dialog has five tabs:
    - **General** — theme (dark/light), notifications, undo behaviour, multi-instance handling.
    - **Monitoring** — prompt delay, scan existing files, catch new sub-folders, DND pause, pattern rules toggle, duplicate detection, cleanup reminder threshold.
-   - **Folders** — add/remove watched folders, manage per-folder destinations, set a folder label, and configure a per-folder whitelist.
+   - **Folders** — add/remove watched folders (origins), add/remove per-folder destinations, set a folder label, and configure a per-folder whitelist.
    - **Rules** — global whitelist patterns, watcher ignore patterns, and auto-rename patterns.
-   - **System** — login autostart, batch mode style, and config export/import.
+   - **System** — login autostart, batch mode style, config export/import, and **Delete all user data**.
 
 ---
 
@@ -254,4 +257,3 @@ A: Yes — two mechanisms skip the prompt entirely. (1) **Explicit pattern rules
 
 **Q: Files in my Downloads folder aren't triggering prompts.**  
 A: Make sure `Downloads` appears in **Settings → Folders → Watched folders**. If it does, check that it isn't also listed as a *destination* for itself (destination folders are skipped). Also verify that the file extension isn't matched by a whitelist or ignore pattern, and that focus mode is not active (the tray icon would be red with a badge if it is).
-
