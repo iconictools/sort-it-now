@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 import pystray
 
 logger = logging.getLogger(__name__)
+PAUSED_ICON_COLOR = "#f87171"
 
 # ── Icon drawing helpers ─────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ def _icon_pending(count: int = 0) -> Image.Image:
 
 
 def _icon_paused(count: int = 0) -> Image.Image:
-    return _create_icon_image("#f87171", badge_count=count)
+    return _create_icon_image(PAUSED_ICON_COLOR, badge_count=count)
 
 
 # ── TrayIcon wrapper ─────────────────────────────────────────────────

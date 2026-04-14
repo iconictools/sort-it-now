@@ -154,7 +154,7 @@ def show_welcome(theme_name: str = "dark", monitored_count: int = 0) -> str:
         text="Folder setup",
         command=lambda: _set_action("setup"),
         fg_color=t["accent"],
-        text_color="#1e1e2e",
+        text_color=t["bg"],
         hover_color=t["btn_active"],
         width=140,
     ).pack(side="left", padx=8)
