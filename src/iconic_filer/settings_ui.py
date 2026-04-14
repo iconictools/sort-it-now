@@ -333,6 +333,12 @@ def _build_folders_tab(
     dbtn.pack(fill="x", pady=(4, 0))
 
     _selected_folder: list[str] = []
+    watch_add_btn: ctk.CTkButton | None = None
+    watch_remove_btn: ctk.CTkButton | None = None
+    watch_open_btn: ctk.CTkButton | None = None
+    dest_add_btn: ctk.CTkButton | None = None
+    dest_remove_btn: ctk.CTkButton | None = None
+    dest_open_btn: ctk.CTkButton | None = None
 
     # Per-folder details (label + whitelist)
     sep2 = ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1)
@@ -403,6 +409,21 @@ def _build_folders_tab(
         else:
             dest_empty.configure(text="")
 
+    def _refresh_action_states() -> None:
+        has_watch = bool(watch_list.curselection())
+        has_selected_folder = bool(_selected_folder)
+        has_dest = bool(dest_list.curselection())
+        if watch_remove_btn is not None:
+            watch_remove_btn.configure(state="normal" if has_watch else "disabled")
+        if watch_open_btn is not None:
+            watch_open_btn.configure(state="normal" if has_watch else "disabled")
+        if dest_add_btn is not None:
+            dest_add_btn.configure(state="normal" if has_selected_folder else "disabled")
+        if dest_remove_btn is not None:
+            dest_remove_btn.configure(state="normal" if has_selected_folder and has_dest else "disabled")
+        if dest_open_btn is not None:
+            dest_open_btn.configure(state="normal" if has_selected_folder and has_dest else "disabled")
+
     def _open_path(path: str) -> None:
         if not os.path.isdir(path):
             messagebox.showwarning("Folder not found", f"This folder is not available:\n{path}", parent=root)
@@ -443,10 +464,12 @@ def _build_folders_tab(
         dest_list.delete(0, "end")
         if not _selected_folder:
             _refresh_empty_state()
+            _refresh_action_states()
             return
         for d in cfg.get_folder_destinations(_selected_folder[0]):
             dest_list.insert("end", d)
         _refresh_empty_state()
+        _refresh_action_states()
 
     def _on_watch_select(_event: object = None) -> None:
         sel = watch_list.curselection()
@@ -456,8 +479,10 @@ def _build_folders_tab(
         _selected_folder.append(watch_list.get(sel[0]))
         _refresh_dests()
         _refresh_per_folder_details()
+        _refresh_action_states()
 
     watch_list.bind("<<ListboxSelect>>", _on_watch_select)
+    dest_list.bind("<<ListboxSelect>>", lambda _event: _refresh_action_states())
 
     def _add_watch() -> None:
         folder = filedialog.askdirectory(title="Choose a folder to watch")
@@ -511,6 +536,7 @@ def _build_folders_tab(
             on_folder_added(folder)
         watch_list.insert("end", folder)
         _refresh_empty_state()
+        _refresh_action_states()
         dest_msg = f"Now watching:\n{folder}\n\n"
         if initial_dests:
             dest_msg += f"Initial destinations: {len(initial_dests)}"
@@ -531,6 +557,7 @@ def _build_folders_tab(
             _selected_folder.clear()
             dest_list.delete(0, "end")
             _refresh_empty_state()
+            _refresh_action_states()
             messagebox.showinfo("Watched folder removed", f"Stopped watching:\n{folder}", parent=root)
 
     def _open_watch() -> None:
@@ -540,9 +567,12 @@ def _build_folders_tab(
             return
         _open_path(watch_list.get(sel[0]))
 
-    _btn(wbtn, "Add watched folder", t, _add_watch, "accent", width=140).pack(side="left", padx=(0, 4))
-    _btn(wbtn, "Remove watched folder", t, _remove_watch, "danger", width=140).pack(side="left", padx=(0, 4))
-    _btn(wbtn, "Open watched folder", t, _open_watch, "normal", width=130).pack(side="left")
+    watch_add_btn = _btn(wbtn, "Add watched folder", t, _add_watch, "accent", width=140)
+    watch_add_btn.pack(side="left", padx=(0, 4))
+    watch_remove_btn = _btn(wbtn, "Remove watched folder", t, _remove_watch, "danger", width=140)
+    watch_remove_btn.pack(side="left", padx=(0, 4))
+    watch_open_btn = _btn(wbtn, "Open watched folder", t, _open_watch, "normal", width=130)
+    watch_open_btn.pack(side="left")
 
     def _add_dest() -> None:
         if not _selected_folder:
@@ -554,6 +584,7 @@ def _build_folders_tab(
             return
         current = list(cfg.get_folder_destinations(folder))
         added_any = False
+        added_count = 0
         for dest in picked:
             if not os.path.isdir(dest):
                 messagebox.showwarning("Invalid destination", f"Destination does not exist:\n{dest}", parent=root)
@@ -577,6 +608,7 @@ def _build_folders_tab(
             current.append(dest)
             dest_list.insert("end", dest)
             added_any = True
+            added_count += 1
         if not added_any:
             messagebox.showinfo(
                 "Already added",
@@ -586,7 +618,12 @@ def _build_folders_tab(
             return
         cfg.set_destinations(folder, current)
         _refresh_empty_state()
-        messagebox.showinfo("Destination added", "Destination folder(s) added successfully.", parent=root)
+        _refresh_action_states()
+        messagebox.showinfo(
+            "Destination added",
+            f"Added {added_count} destination folder(s).",
+            parent=root,
+        )
 
     def _remove_dest() -> None:
         if not _selected_folder:
@@ -608,6 +645,7 @@ def _build_folders_tab(
             cfg.set_destinations(folder, current)
         dest_list.delete(sel[0])
         _refresh_empty_state()
+        _refresh_action_states()
         messagebox.showinfo("Destination removed", f"Removed destination:\n{dest}", parent=root)
 
     def _open_dest() -> None:
@@ -617,9 +655,12 @@ def _build_folders_tab(
             return
         _open_path(dest_list.get(sel[0]))
 
-    _btn(dbtn, "Add destination", t, _add_dest, "accent", width=130).pack(side="left", padx=(0, 4))
-    _btn(dbtn, "Remove destination", t, _remove_dest, "danger", width=130).pack(side="left", padx=(0, 4))
-    _btn(dbtn, "Open destination", t, _open_dest, "normal", width=130).pack(side="left")
+    dest_add_btn = _btn(dbtn, "Add destination", t, _add_dest, "accent", width=130)
+    dest_add_btn.pack(side="left", padx=(0, 4))
+    dest_remove_btn = _btn(dbtn, "Remove destination", t, _remove_dest, "danger", width=130)
+    dest_remove_btn.pack(side="left", padx=(0, 4))
+    dest_open_btn = _btn(dbtn, "Open destination", t, _open_dest, "normal", width=130)
+    dest_open_btn.pack(side="left")
 
     # Quick-Add options
     sep = ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1)
@@ -640,6 +681,7 @@ def _build_folders_tab(
     _check(qa_frame, "Start watching immediately", qa_watch, t).pack(anchor="w", pady=2)
 
     _refresh_empty_state()
+    _refresh_action_states()
 
     return {
         "quick_add_inherit_destinations": qa_inherit,
