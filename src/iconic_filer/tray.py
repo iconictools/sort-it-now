@@ -192,11 +192,7 @@ class TrayIcon:
         self._pending_count = count
         if self._icon:
             if self._prompts_paused:
-                self._icon.icon = _icon_paused(count if pending else 0)
-                status = "paused"
-                if pending:
-                    status += f", {count} queued"
-                self._icon.title = f"Iconic File Filer ({status})"
+                self._apply_paused_visual(count if pending else 0)
             elif pending:
                 self._icon.icon = _icon_pending(count)
                 self._icon.title = f"Iconic File Filer ({count} pending)"
@@ -213,8 +209,7 @@ class TrayIcon:
         """Refresh the icon and title to reflect the monitored folder count."""
         if self._icon:
             if self._prompts_paused:
-                self._icon.icon = _icon_paused()
-                self._icon.title = "Iconic File Filer (paused)"
+                self._apply_paused_visual()
                 return
             self._icon.icon = _icon_idle()
             n = self._monitored_count
@@ -222,6 +217,16 @@ class TrayIcon:
                 self._icon.title = f"Iconic File Filer ({n} folder{'s' if n != 1 else ''} watched)"
             else:
                 self._icon.title = "Iconic File Filer"
+
+    def _apply_paused_visual(self, queued_count: int = 0) -> None:
+        """Apply paused icon/title style, with optional queued badge count."""
+        if not self._icon:
+            return
+        self._icon.icon = _icon_paused(queued_count)
+        status = "paused"
+        if queued_count:
+            status += f", {queued_count} queued"
+        self._icon.title = f"Iconic File Filer ({status})"
 
     def stop(self) -> None:
         if self._icon:
