@@ -154,7 +154,7 @@ def resolve_conflict(
 
     ctk.CTkButton(
         btn_frame,
-        text="Replace with new file",
+        text="Replace existing file",
         fg_color=t["danger"],
         text_color="#ffffff",
         hover_color="#c9374a",

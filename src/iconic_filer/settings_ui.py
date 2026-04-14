@@ -409,6 +409,7 @@ def _build_folders_tab(
             return
         try:
             if sys.platform == "win32":
+                # Windows-only API guarded by platform check.
                 os.startfile(path)  # type: ignore[attr-defined]
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", path])
@@ -480,7 +481,7 @@ def _build_folders_tab(
         initial_dests: list[str] = []
         if messagebox.askyesno(
             "Add destinations now?",
-            "Do you want to choose destination folders now?",
+            "Would you like to add destination folders for this watched folder now?",
             parent=root,
         ):
             picked = pick_destination_folders(folder, parent=root)
@@ -539,8 +540,8 @@ def _build_folders_tab(
             return
         _open_path(watch_list.get(sel[0]))
 
-    _btn(wbtn, "Add watched folder", t, _add_watch, "accent", width=130).pack(side="left", padx=(0, 4))
-    _btn(wbtn, "Remove watched folder", t, _remove_watch, "danger", width=150).pack(side="left", padx=(0, 4))
+    _btn(wbtn, "Add watched folder", t, _add_watch, "accent", width=140).pack(side="left", padx=(0, 4))
+    _btn(wbtn, "Remove watched folder", t, _remove_watch, "danger", width=140).pack(side="left", padx=(0, 4))
     _btn(wbtn, "Open watched folder", t, _open_watch, "normal", width=130).pack(side="left")
 
     def _add_dest() -> None:
@@ -616,9 +617,9 @@ def _build_folders_tab(
             return
         _open_path(dest_list.get(sel[0]))
 
-    _btn(dbtn, "Add destination", t, _add_dest, "accent", width=120).pack(side="left", padx=(0, 4))
+    _btn(dbtn, "Add destination", t, _add_dest, "accent", width=130).pack(side="left", padx=(0, 4))
     _btn(dbtn, "Remove destination", t, _remove_dest, "danger", width=130).pack(side="left", padx=(0, 4))
-    _btn(dbtn, "Open destination", t, _open_dest, "normal", width=120).pack(side="left")
+    _btn(dbtn, "Open destination", t, _open_dest, "normal", width=130).pack(side="left")
 
     # Quick-Add options
     sep = ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1)
