@@ -734,7 +734,7 @@ class SetupWizard:
         ).pack(side="left", padx=10)
         ctk.CTkButton(
             btn_frame,
-            text="Complete Setup & Start ✓",
+            text="Complete setup & start in tray ✓",
             fg_color=t["btn_bg"],
             text_color=t["btn_fg"],
             hover_color=t["accent"],

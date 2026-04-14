@@ -94,7 +94,7 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
                                                        padx=(0, 8), pady=3)
     row += 1
 
-    _section_lbl(f, "Sort Prompt Behaviour", t).grid(row=row, column=0, columnspan=2,
+    _section_lbl(f, "Sort Prompt Behavior", t).grid(row=row, column=0, columnspan=2,
                                                       sticky="w", padx=8, pady=(12, 4))
     row += 1
     _lbl(f, 'Pre-check "Always send .ext here":', t).grid(row=row, column=0, sticky="w",
@@ -135,8 +135,8 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
                                                        padx=(0, 8), pady=3)
     row += 1
 
-    _section_lbl(f, "Undo Behaviour", t).grid(row=row, column=0, columnspan=2, sticky="w",
-                                               padx=8, pady=(12, 4))
+    _section_lbl(f, "Undo Behavior", t).grid(row=row, column=0, columnspan=2, sticky="w",
+                                                padx=8, pady=(12, 4))
     row += 1
     _lbl(f, "When undoing a renamed move:", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
     undo_name_var = tk.StringVar(value=cfg.get_setting("undo_restore_name", "ask"))
@@ -148,7 +148,7 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
     _section_lbl(f, "Multi-Instance", t).grid(row=row, column=0, columnspan=2, sticky="w",
                                                padx=8, pady=(12, 4))
     row += 1
-    _lbl(f, "Second launch behaviour:", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
+    _lbl(f, "Second launch behavior:", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
     multi_var = tk.StringVar(value=cfg.get_setting("multi_instance_behavior", "prompt"))
     ctk.CTkOptionMenu(f, variable=multi_var, values=["prompt", "always-merge", "ignore"],
                       font=ctk.CTkFont(size=10)).grid(row=row, column=1, sticky="ew",
@@ -168,7 +168,12 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
     }
 
 
-def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
+def _build_monitoring_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    on_rescan: Callable[[], None] | None = None,
+) -> dict:
     f = tabview.tab("Monitoring")
     row = 0
 
@@ -188,6 +193,28 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
     scan_var = tk.BooleanVar(value=cfg.get_setting("scan_existing_enabled", False))
     _check(f, "Enabled", scan_var, t).grid(row=row, column=1, sticky="w", padx=(0, 8), pady=3)
     row += 1
+
+    if on_rescan is not None:
+        _lbl(f, "Run a one-time rescan now:", t).grid(
+            row=row, column=0, sticky="w", padx=8, pady=3
+        )
+        _btn(
+            f,
+            "Rescan watched folders now",
+            t,
+            on_rescan,
+            "accent",
+            width=190,
+        ).grid(row=row, column=1, sticky="w", padx=(0, 8), pady=3)
+        row += 1
+
+        _lbl(
+            f,
+            "Rescan respects ignore patterns and whitelist patterns.",
+            t,
+            size=9,
+        ).grid(row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 3))
+        row += 1
 
     _lbl(f, "Watch folders too (catch folders):", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
     catch_var = tk.BooleanVar(value=cfg.get_setting("catch_folders", False))
@@ -726,12 +753,14 @@ class SettingsDialog:
         config: "Config",
         initial_tab: str = "General",
         on_open_sorting_rules: Callable[[], None] | None = None,
+        on_rescan: Callable[[], None] | None = None,
     ) -> None:
         self._config = config
         self._theme_name = config.get_setting("theme", "dark")
         self._theme = get_theme(self._theme_name)
         self._initial_tab = initial_tab
         self._on_open_sorting_rules = on_open_sorting_rules
+        self._on_rescan = on_rescan
 
     def show(self) -> None:
         """Display the settings dialog (blocks until closed)."""
@@ -763,7 +792,12 @@ class SettingsDialog:
             tabview.add(tab_name)
 
         gen_vars = _build_general_tab(tabview, cfg, t)
-        mon_vars = _build_monitoring_tab(tabview, cfg, t)
+        mon_vars = _build_monitoring_tab(
+            tabview,
+            cfg,
+            t,
+            on_rescan=self._on_rescan,
+        )
         folders_vars = _build_folders_tab(tabview, cfg, t, root)
         _build_rules_tab(
             tabview,

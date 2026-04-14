@@ -32,6 +32,7 @@ def show_dashboard(
     lock: threading.Lock,
     watcher: Any,
     theme_name: str,
+    on_rescan: Callable[[], None] | None = None,
 ) -> None:
     """Open the activity window (blocks until closed)."""
     theme = get_theme(theme_name)
@@ -59,6 +60,21 @@ def show_dashboard(
             font=ctk.CTkFont(size=11),
             text_color=theme["danger"],
         ).pack(pady=4)
+
+    if on_rescan is not None:
+        actions = ctk.CTkFrame(root, fg_color="transparent")
+        actions.pack(fill="x", padx=24, pady=(2, 6))
+        ctk.CTkButton(
+            actions,
+            text="Rescan watched folders now",
+            fg_color=theme["accent"],
+            text_color="#1e1e2e",
+            hover_color=theme["btn_active"],
+            font=ctk.CTkFont(size=10, weight="bold"),
+            corner_radius=8,
+            height=30,
+            command=on_rescan,
+        ).pack(anchor="w")
 
     # ── Sorting stats ─────────────────────────────────────────────────
     total = history.total_count()

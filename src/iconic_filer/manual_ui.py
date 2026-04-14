@@ -32,7 +32,7 @@ def show_manual(theme_name: str = "dark") -> None:
     ).pack(pady=(18, 6))
     ctk.CTkLabel(
         root,
-        text="How to set up and use the app end-to-end.",
+        text="How to set up and use the app from start to finish.",
         font=_font(11),
         text_color=t["muted"],
     ).pack(pady=(0, 10))

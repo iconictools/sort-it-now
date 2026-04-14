@@ -86,6 +86,8 @@ class TrayIcon:
         Called when the user clicks "Manage Rules".
     on_add_folder:
         Called when the user clicks "Add folder to watch...".
+    on_rescan:
+        Called when the user clicks "Rescan watched folders".
     on_quit:
         Called when the user clicks "Quit".
     """
@@ -99,6 +101,7 @@ class TrayIcon:
         on_open_rules: Callable[[], None] | None = None,
         on_open_manual: Callable[[], None] | None = None,
         on_add_folder: Callable[[], None] | None = None,
+        on_rescan: Callable[[], None] | None = None,
         on_process_pending: Callable[[], None] | None = None,
         on_quit: Callable[[], None] | None = None,
     ) -> None:
@@ -109,6 +112,7 @@ class TrayIcon:
         self._on_rules = on_open_rules or (lambda: None)
         self._on_manual = on_open_manual or (lambda: None)
         self._on_add_folder = on_add_folder or (lambda: None)
+        self._on_rescan = on_rescan or (lambda: None)
         self._on_process_pending = on_process_pending or (lambda: None)
         self._on_quit = on_quit or (lambda: None)
         self._icon: pystray.Icon | None = None
@@ -129,6 +133,10 @@ class TrayIcon:
             pystray.MenuItem(
                 "Folder setup...",
                 self._action(self._on_add_folder),
+            ),
+            pystray.MenuItem(
+                "Rescan watched folders",
+                self._action(self._on_rescan),
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(

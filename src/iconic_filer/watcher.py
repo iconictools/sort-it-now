@@ -263,18 +263,19 @@ class FolderWatcher:
         folder: str,
         callback: Callable[[str], None],
         whitelist: list[str] | None = None,
-    ) -> None:
+    ) -> int:
         """Scan *folder* for existing files (and folders when enabled).
 
         Respects ignore patterns and optional *whitelist* patterns.
         """
         folder = os.path.abspath(folder)
         wl = whitelist or []
+        matched = 0
         try:
             entries = list(os.scandir(folder))
         except OSError as exc:
             logger.info("Skipping scan of %s: %s", folder, exc)
-            return
+            return 0
         for entry in entries:
             if entry.is_dir():
                 if not self._catch_folders:
@@ -294,3 +295,5 @@ class FolderWatcher:
             if skip:
                 continue
             callback(entry.path)
+            matched += 1
+        return matched

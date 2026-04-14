@@ -101,6 +101,8 @@ class App:
         self._prompt_semaphore = threading.Semaphore(1)
         # Active snooze timers so they can be cancelled on quit.
         self._snooze_timers: list[threading.Timer] = []
+        # Prevent overlapping full-folder rescans.
+        self._rescan_lock = threading.Lock()
 
         self.achievements = Achievements(
             os.path.join(os.path.dirname(self.config.path), "achievements.db")
@@ -119,6 +121,7 @@ class App:
             on_open_rules=self._show_rules,
             on_open_manual=self._show_manual,
             on_add_folder=self._show_folder_setup,
+            on_rescan=self._trigger_rescan,
             on_process_pending=self._process_batch_queue,
             on_quit=self._quit,
         )
@@ -620,6 +623,41 @@ class App:
                 "Added permanent destination %s for %s", dest, monitored_folder
             )
 
+    def _trigger_rescan(self) -> None:
+        """Start a one-time scan of all watched folders in a background thread."""
+        threading.Thread(target=self._rescan_watched_folders, daemon=True).start()
+
+    def _rescan_watched_folders(self) -> None:
+        """Scan all watched folders, respecting ignore + whitelist patterns."""
+        if not self._rescan_lock.acquire(blocking=False):
+            logger.info("Rescan already running, ignoring duplicate request.")
+            return
+        try:
+            whitelist = self.config.get_whitelist()
+            monitored = list(self.config.monitored_folders)
+            if not monitored:
+                logger.info("Rescan requested with no watched folders configured.")
+                return
+            logger.info("Starting manual rescan across %d watched folder(s).", len(monitored))
+            matched = 0
+            scanned = 0
+            for folder in monitored:
+                if not os.path.isdir(folder):
+                    continue
+                scanned += 1
+                matched += self.watcher.scan_existing(
+                    folder,
+                    self._on_file_detected,
+                    whitelist,
+                )
+            logger.info(
+                "Manual rescan finished: %d candidate item(s) found across %d folder(s).",
+                matched,
+                scanned,
+            )
+        finally:
+            self._rescan_lock.release()
+
     def _add_folder_via_tray(self) -> None:
         """Handle 'Add folder to watch...' from the tray menu.
 
@@ -876,6 +914,7 @@ class App:
             target=lambda: SettingsDialog(
                 self.config,
                 on_open_sorting_rules=self._show_rules,
+                on_rescan=self._trigger_rescan,
             ).show(),
             daemon=True,
         )
@@ -897,6 +936,7 @@ class App:
                 self.config,
                 initial_tab="Folders",
                 on_open_sorting_rules=self._show_rules,
+                on_rescan=self._trigger_rescan,
             ).show(),
             daemon=True,
         )
@@ -917,7 +957,7 @@ class App:
             target=show_dashboard,
             args=(
                 self.config, self.history, self._batch_queue,
-                self._lock, self.watcher, theme_name,
+                self._lock, self.watcher, theme_name, self._trigger_rescan,
             ),
             daemon=True,
         )
