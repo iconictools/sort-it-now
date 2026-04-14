@@ -165,6 +165,8 @@ class TestHistoryExtensions:
         dst = os.path.join(self._tmpdir, "dst-missing.txt")
         action_id = h.record(src, dst)
         assert h.undo_by_id(action_id) is None
+        assert not os.path.exists(src)
+        assert not os.path.exists(dst)
         row = h._conn.execute(
             "SELECT undone FROM actions WHERE id = ?",
             (action_id,),

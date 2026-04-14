@@ -114,6 +114,8 @@ class TestHistory:
         dst = os.path.join(self._tmpdir, "missing-dest.txt")
         action_id = hist.record(src, dst)
         assert hist.undo_last() is None
+        assert not os.path.exists(src)
+        assert not os.path.exists(dst)
         row = hist._conn.execute(
             "SELECT undone FROM actions WHERE id = ?",
             (action_id,),
