@@ -234,13 +234,14 @@ class App:
             if folder in self.config.monitored_folders:
                 return
             # Find a parent folder to inherit destinations from (proper path containment)
+            monitored = list(self.config.monitored_folders)
+            monitored_abs = [(mf, os.path.abspath(mf)) for mf in monitored]
             parent_monitored = next(
                 (
-                    mf for mf in self.config.monitored_folders
-                    if folder == os.path.abspath(mf)
-                    or folder.startswith(os.path.abspath(mf) + os.sep)
+                    mf for mf, mf_abs in monitored_abs
+                    if folder == mf_abs or folder.startswith(mf_abs + os.sep)
                 ),
-                next(iter(self.config.monitored_folders), ""),
+                monitored[0] if monitored else "",
             )
             logger.info("IPC: adding folder %s (parent: %s)", folder, parent_monitored)
             threading.Thread(

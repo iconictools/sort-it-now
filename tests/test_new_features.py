@@ -145,8 +145,7 @@ class TestHistoryExtensions:
         shutil.move(src, dst)
         action_id = h.record(src, dst)
 
-        def _raise_move(src, dst):
-            del src, dst
+        def _raise_move(_src, _dst):
             raise OSError("simulated move failure")
 
         monkeypatch.setattr(shutil, "move", _raise_move)
