@@ -435,10 +435,7 @@ def show_batch_list(
         ).grid(row=ui_row, column=2, sticky="ew", pady=3, padx=(8, 0))
         rows.append((filepath, dest_var, action_var))
 
-    moved = [0]
-    whitelisted = [0]
-    snoozed = [0]
-    skipped = [0]
+    counters = {"moved": 0, "whitelisted": 0, "snoozed": 0, "skipped": 0}
 
     def _apply_actions() -> None:
         for filepath, dest_var, action_var in rows:
@@ -450,22 +447,25 @@ def show_batch_list(
                 if dest:
                     move_file_fn(filepath, dest)
                     rules.record_action(filepath, dest)
-                    moved[0] += 1
+                    counters["moved"] += 1
                 else:
-                    skipped[0] += 1
+                    counters["skipped"] += 1
             elif action == "Whitelist":
                 if on_whitelist is not None:
                     on_whitelist(os.path.basename(filepath))
-                whitelisted[0] += 1
+                counters["whitelisted"] += 1
             elif action == "Snooze":
                 if on_snooze is not None:
                     on_snooze(filepath)
-                snoozed[0] += 1
+                counters["snoozed"] += 1
             else:
-                skipped[0] += 1
+                counters["skipped"] += 1
         logger.info(
             "Batch applied: moved=%d, whitelisted=%d, snoozed=%d, skipped=%d",
-            moved[0], whitelisted[0], snoozed[0], skipped[0],
+            counters["moved"],
+            counters["whitelisted"],
+            counters["snoozed"],
+            counters["skipped"],
         )
         root.destroy()
 

@@ -1121,11 +1121,19 @@ class App:
 
         config_dir = os.path.dirname(self.config.path)
         if os.path.isdir(config_dir):
-            for _ in range(3):
+            for attempt in range(1, 4):
                 try:
                     shutil.rmtree(config_dir)
                     break
-                except OSError:
+                except OSError as exc:
+                    logger.warning(
+                        "Delete-all-user-data retry %d/3 failed for %s: %s",
+                        attempt,
+                        config_dir,
+                        exc,
+                    )
                     time.sleep(0.2)
+            if os.path.isdir(config_dir):
+                logger.error("Delete-all-user-data failed; directory still exists: %s", config_dir)
 
         self.tray.stop()
