@@ -99,6 +99,8 @@ class TestHistory:
 
         monkeypatch.setattr(shutil, "move", _raise_move)
         assert hist.undo_last() is None
+        assert os.path.exists(dst)
+        assert not os.path.exists(src)
         row = hist._conn.execute(
             "SELECT undone FROM actions WHERE id = ?",
             (action_id,),
