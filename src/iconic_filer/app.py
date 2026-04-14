@@ -19,6 +19,7 @@ from iconic_filer.dashboard_ui import show_batch_list, show_dashboard
 from iconic_filer.duplicate import find_duplicate
 from iconic_filer.history import History
 from iconic_filer.ipc import IPCServer
+from iconic_filer.manual_ui import show_manual, show_welcome
 from iconic_filer.notifications import notify
 from iconic_filer.prompt import SortPrompt, SetupWizard, pick_destination_folders
 from iconic_filer.rules import Rules
@@ -116,6 +117,7 @@ class App:
             on_undo=self._undo_last,
             on_open_settings=self._show_settings,
             on_open_rules=self._show_rules,
+            on_open_manual=self._show_manual,
             on_add_folder=self._show_folder_setup,
             on_process_pending=self._process_batch_queue,
             on_quit=self._quit,
@@ -138,6 +140,20 @@ class App:
                 return
             for folder, dests in folders.items():
                 self.config.add_monitored_folder(folder, dests)
+        elif not self.config.get_setting("startup_welcome_seen", False):
+            action = show_welcome(
+                theme_name=self.config.get_setting("theme", "dark"),
+                monitored_count=len(self.config.monitored_folders),
+            )
+            self.config.set_setting("startup_welcome_seen", True)
+            if action == "setup":
+                SettingsDialog(
+                    self.config,
+                    initial_tab="Folders",
+                    on_open_sorting_rules=self._show_rules,
+                ).show()
+            elif action == "manual":
+                show_manual(self.config.get_setting("theme", "dark"))
 
         # Validate monitored folders exist before starting
         missing: list[str] = []
@@ -787,8 +803,22 @@ class App:
         self._focus_mode = not self._focus_mode
         self.config.set_setting("focus_mode", self._focus_mode)
         self.tray.set_focus_mode(self._focus_mode)
+        fallback = self.config.get_setting("notification_fallback", "toast-fallback")
         if not self._focus_mode:
             self._process_batch_queue()
+            if self.config.get_setting("native_notifications", True):
+                notify(
+                    "Iconic File Filer",
+                    "Sorting prompts resumed.",
+                    fallback_strategy=fallback,
+                )
+        else:
+            if self.config.get_setting("native_notifications", True):
+                notify(
+                    "Iconic File Filer",
+                    "Sorting prompts paused for all watched folders.",
+                    fallback_strategy=fallback,
+                )
         logger.info("Focus mode: %s", self._focus_mode)
 
     def _undo_last(self) -> None:
@@ -847,6 +877,15 @@ class App:
                 self.config,
                 on_open_sorting_rules=self._show_rules,
             ).show(),
+            daemon=True,
+        )
+        t.start()
+
+    def _show_manual(self) -> None:
+        """Open the in-app manual."""
+        theme_name = self.config.get_setting("theme", "dark")
+        t = threading.Thread(
+            target=lambda: show_manual(theme_name),
             daemon=True,
         )
         t.start()

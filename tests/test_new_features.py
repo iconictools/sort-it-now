@@ -204,6 +204,11 @@ class TestModuleImports:
         from iconic_filer.prompt import cli_setup
         assert callable(cli_setup)
 
+    @skip_no_tkinter
+    def test_import_manual_ui(self):
+        import iconic_filer.manual_ui
+        assert hasattr(iconic_filer.manual_ui, "show_manual")
+
 
 class TestDashboardUI:
     """Test that dashboard_ui functions are importable."""
@@ -604,6 +609,27 @@ class TestTrayMenuCallbacks:
         assert "Folder setup..." in labels
         assert "Activity & Queue" in labels
         assert "Sorting Rules..." in labels
+        assert "Manual" in labels
+
+        pause_items = [item for item in menu.items if getattr(item, "default", False)]
+        assert len(pause_items) == 1
+
+    @skip_no_display
+    def test_tray_focus_mode_uses_paused_title_state(self):
+        from iconic_filer.tray import TrayIcon
+
+        class _DummyIcon:
+            def __init__(self):
+                self.icon = None
+                self.title = ""
+
+        tray = TrayIcon()
+        tray._icon = _DummyIcon()  # noqa: SLF001 - targeted unit test
+        tray.set_focus_mode(True)
+        tray.set_pending(True, 2)
+
+        assert "paused" in tray._icon.title.lower()  # noqa: SLF001 - targeted unit test
+        assert "queued" in tray._icon.title.lower()  # noqa: SLF001 - targeted unit test
 
 
 class TestSettingsDialogInit:

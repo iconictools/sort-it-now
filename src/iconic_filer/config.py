@@ -80,6 +80,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         # When a second instance launches while one is already running,
         # how should they behave?
         "multi_instance_behavior": "prompt",
+        # Show startup welcome once after install/update.
+        "startup_welcome_seen": False,
         # Quick-Add Folder
         "quick_add_inherit_destinations": True,
         "quick_add_auto_whitelist": True,
