@@ -541,7 +541,7 @@ def _build_folders_tab(
 
     _btn(wbtn, "Add watched folder", t, _add_watch, "accent", width=130).pack(side="left", padx=(0, 4))
     _btn(wbtn, "Remove watched folder", t, _remove_watch, "danger", width=150).pack(side="left", padx=(0, 4))
-    _btn(wbtn, "Open selected", t, _open_watch, "normal", width=100).pack(side="left")
+    _btn(wbtn, "Open watched folder", t, _open_watch, "normal", width=130).pack(side="left")
 
     def _add_dest() -> None:
         if not _selected_folder:
@@ -618,7 +618,7 @@ def _build_folders_tab(
 
     _btn(dbtn, "Add destination", t, _add_dest, "accent", width=120).pack(side="left", padx=(0, 4))
     _btn(dbtn, "Remove destination", t, _remove_dest, "danger", width=130).pack(side="left", padx=(0, 4))
-    _btn(dbtn, "Reveal destination", t, _open_dest, "normal", width=120).pack(side="left")
+    _btn(dbtn, "Open destination", t, _open_dest, "normal", width=120).pack(side="left")
 
     # Quick-Add options
     sep = ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1)
