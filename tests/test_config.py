@@ -133,3 +133,18 @@ class TestConfig:
         cfg = Config(self._path)
         assert isinstance(cfg.monitored_folders["/tmp/old"], dict)
         assert cfg.get_folder_destinations("/tmp/old") == ["/tmp/dest"]
+
+    def test_add_monitored_folder_dedups_by_normalized_path(self, monkeypatch):
+        cfg = Config(self._path)
+        monkeypatch.setattr("iconic_filer.config.os.path.normcase", lambda p: p.lower())
+        cfg.add_monitored_folder("/tmp/Foo", ["/tmp/d1"])
+        cfg.add_monitored_folder("/tmp/foo", ["/tmp/d2"])
+        assert len(cfg.monitored_folders) == 1
+        assert cfg.get_folder_destinations("/tmp/FOO") == ["/tmp/d1"]
+
+    def test_remove_monitored_folder_matches_normalized_path(self, monkeypatch):
+        cfg = Config(self._path)
+        monkeypatch.setattr("iconic_filer.config.os.path.normcase", lambda p: p.lower())
+        cfg.add_monitored_folder("/tmp/Foo", ["/tmp/d1"])
+        cfg.remove_monitored_folder("/tmp/foo")
+        assert cfg.monitored_folders == {}

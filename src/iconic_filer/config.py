@@ -172,12 +172,25 @@ class Config:
         """Return ``{folder_path: {per-folder settings}}`` mapping."""
         return self._data.get("monitored_folders", {})
 
+    @staticmethod
+    def _path_key(path: str) -> str:
+        """Return a normalized key for cross-platform path identity checks."""
+        return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+    def _find_folder_key(self, folder: str) -> str | None:
+        """Return the existing stored key matching *folder*, if any."""
+        target = self._path_key(folder)
+        for key in self._data.get("monitored_folders", {}):
+            if self._path_key(key) == target:
+                return key
+        return None
+
     def add_monitored_folder(
         self, folder: str, destinations: list[str] | None = None
     ) -> None:
         """Register *folder* for monitoring with optional *destinations*."""
         folder = os.path.abspath(folder)
-        if folder not in self._data["monitored_folders"]:
+        if self._find_folder_key(folder) is None:
             self._data["monitored_folders"][folder] = {
                 **_FOLDER_DEFAULTS,
                 "destinations": destinations or [],
@@ -186,17 +199,18 @@ class Config:
 
     def remove_monitored_folder(self, folder: str) -> None:
         """Stop monitoring *folder*."""
-        folder = os.path.abspath(folder)
-        self._data["monitored_folders"].pop(folder, None)
+        key = self._find_folder_key(folder) or os.path.abspath(folder)
+        self._data["monitored_folders"].pop(key, None)
         self.save()
 
     def set_destinations(self, folder: str, destinations: list[str]) -> None:
         """Set destination folders for a monitored *folder*."""
         folder = os.path.abspath(folder)
         mf = self._data["monitored_folders"]
-        if folder not in mf:
-            mf[folder] = {**_FOLDER_DEFAULTS}
-        mf[folder]["destinations"] = destinations
+        key = self._find_folder_key(folder) or folder
+        if key not in mf:
+            mf[key] = {**_FOLDER_DEFAULTS}
+        mf[key]["destinations"] = destinations
         self.save()
 
     # ------------------------------------------------------------------
@@ -207,9 +221,10 @@ class Config:
         """Return the per-folder settings dict, auto-creating if absent."""
         folder = os.path.abspath(folder)
         mf = self._data.setdefault("monitored_folders", {})
-        if folder not in mf:
-            mf[folder] = {**_FOLDER_DEFAULTS}
-        entry = mf[folder]
+        key = self._find_folder_key(folder) or folder
+        if key not in mf:
+            mf[key] = {**_FOLDER_DEFAULTS}
+        entry = mf[key]
         # Fill in any missing keys from defaults (forward-compat)
         for k, v in _FOLDER_DEFAULTS.items():
             if k not in entry:
