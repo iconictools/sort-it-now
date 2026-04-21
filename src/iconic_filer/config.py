@@ -199,8 +199,9 @@ class Config:
 
     def remove_monitored_folder(self, folder: str) -> None:
         """Stop monitoring *folder*."""
-        key = self._find_folder_key(folder) or os.path.abspath(folder)
-        self._data["monitored_folders"].pop(key, None)
+        key = self._find_folder_key(folder)
+        if key is not None:
+            self._data["monitored_folders"].pop(key, None)
         self.save()
 
     def set_destinations(self, folder: str, destinations: list[str]) -> None:

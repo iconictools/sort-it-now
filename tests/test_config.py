@@ -141,6 +141,7 @@ class TestConfig:
         cfg.add_monitored_folder("/tmp/foo", ["/tmp/d2"])
         assert len(cfg.monitored_folders) == 1
         assert cfg.get_folder_destinations("/tmp/FOO") == ["/tmp/d1"]
+        assert cfg.get_folder_destinations("/tmp/Foo") == ["/tmp/d1"]
 
     def test_remove_monitored_folder_matches_normalized_path(self, monkeypatch):
         cfg = Config(self._path)
