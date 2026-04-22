@@ -316,7 +316,7 @@ class App:
                 if not os.path.isdir(folder):
                     if folder not in self._health_notified:
                         fallback = self.config.get_setting(
-                            "notification_fallback", "toast-fallback"
+                            "notification_fallback", "log-only"
                         )
                         notify(
                             "Folder unavailable",
@@ -418,7 +418,7 @@ class App:
             filepath, destinations, merged_ext_map
         )
 
-        style = self.config.get_setting("batch_mode_style", "one-by-one")
+        style = self.config.get_setting("batch_mode_style", "batch-list")
         if style == "batch-list":
             with self._lock:
                 if filepath not in self._batch_queue:
@@ -486,7 +486,7 @@ class App:
         else:
             # Auto-learn: silently create a rule once the user has manually
             # sorted the same extension to the same destination N times.
-            threshold = self.config.get_setting("auto_learn_threshold", 3)
+            threshold = self.config.get_setting("auto_learn_threshold", 0)
             if threshold and ext_lower and ext_lower not in self.rules.extension_map:
                 dest_abs = os.path.abspath(destination)
                 count = sum(
@@ -575,7 +575,7 @@ class App:
                         f"Achievement unlocked: {ach.emoji} {ach.name}",
                         ach.description,
                         fallback_strategy=self.config.get_setting(
-                            "notification_fallback", "toast-fallback"
+                            "notification_fallback", "log-only"
                         ),
                     )
             except Exception:
@@ -586,7 +586,7 @@ class App:
                 src_name = os.path.basename(src)
                 dest_name = os.path.basename(dest_dir)
                 fallback = self.config.get_setting(
-                    "notification_fallback", "toast-fallback"
+                    "notification_fallback", "log-only"
                 )
                 notify(
                     "File sorted", f"{src_name} -> {dest_name}",
@@ -748,7 +748,7 @@ class App:
                 matched,
                 scanned,
             )
-            fallback = self.config.get_setting("notification_fallback", "toast-fallback")
+            fallback = self.config.get_setting("notification_fallback", "log-only")
             if self.config.get_setting("native_notifications", True):
                 if matched:
                     notify(
@@ -949,7 +949,7 @@ class App:
         self._focus_mode = not self._focus_mode
         self.config.set_setting("focus_mode", self._focus_mode)
         self.tray.set_focus_mode(self._focus_mode)
-        fallback = self.config.get_setting("notification_fallback", "toast-fallback")
+        fallback = self.config.get_setting("notification_fallback", "log-only")
         if not self._focus_mode:
             self._process_batch_queue()
             if self.config.get_setting("native_notifications", True):
@@ -969,7 +969,7 @@ class App:
 
     def _undo_last(self) -> None:
         result = self.history.undo_last()
-        fallback = self.config.get_setting("notification_fallback", "toast-fallback")
+        fallback = self.config.get_setting("notification_fallback", "log-only")
         if not result:
             logger.info("Nothing to undo.")
             if self.config.get_setting("native_notifications", True):
@@ -1011,11 +1011,12 @@ class App:
             root.withdraw()
             root.attributes("-topmost", True)
             answer = messagebox.askyesno(
-                "Undo rename?",
-                f"The file was renamed during the move:\n\n"
-                f"  Original name: {dst_basename}\n"
-                f"  Current name:  {src_basename}\n\n"
-                "Do you also want to restore the original filename?",
+                "Keep renamed version?",
+                f"The file was renamed when it was sorted:\n\n"
+                f"  Before sorting: {src_basename}\n"
+                f"  Sorted as:      {dst_basename}\n\n"
+                f'It has been restored to "{src_basename}".\n'
+                f'Do you also want to rename it to "{dst_basename}"?',
                 parent=root,
             )
             root.destroy()
@@ -1025,9 +1026,9 @@ class App:
             restored = os.path.join(os.path.dirname(src_path), dst_basename)
             try:
                 os.rename(src_path, restored)
-                logger.info("Name restored: %s -> %s", src_basename, dst_basename)
+                logger.info("Renamed back to sorted name: %s -> %s", src_basename, dst_basename)
             except OSError as exc:
-                logger.warning("Could not restore filename: %s", exc)
+                logger.warning("Could not rename to sorted name: %s", exc)
 
     def _show_settings(self) -> None:
         """Open the settings dialog."""
@@ -1121,7 +1122,7 @@ class App:
             self._batch_open_timer = None
         self.tray.set_pending(False)
 
-        style = self.config.get_setting("batch_mode_style", "one-by-one")
+        style = self.config.get_setting("batch_mode_style", "batch-list")
         if style == "batch-list" and queue:
             theme_name = self.config.get_setting("theme", "dark")
             threading.Thread(
