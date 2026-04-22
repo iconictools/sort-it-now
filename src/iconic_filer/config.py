@@ -409,7 +409,7 @@ class Config:
             for info in zf.infolist():
                 # Resolve where the entry would land after extraction.
                 target = os.path.realpath(os.path.join(dest_dir, info.filename))
-                if not target.startswith(dest_dir + os.sep) and target != dest_dir:
+                if not (target == dest_dir or target.startswith(dest_dir + os.sep)):
                     raise ValueError(
                         f"Unsafe zip entry (path traversal): {info.filename!r}"
                     )
