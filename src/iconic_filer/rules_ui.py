@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING, Any, Callable
 
 import customtkinter as ctk
@@ -249,6 +250,18 @@ class RulesDialog:
         def _add_ext_rule() -> None:
             ext = ext_var.get().strip()
             if not ext:
+                messagebox.showwarning(
+                    "Extension required",
+                    "Enter a file extension (e.g. .pdf) before adding a rule.",
+                    parent=root,
+                )
+                return
+            if not ext.startswith(".") or len(ext) < 2:
+                messagebox.showwarning(
+                    "Invalid extension",
+                    f"Extensions must start with a dot and have at least one character after it.\n\nEntered: {ext!r}",
+                    parent=root,
+                )
                 return
             dest = filedialog.askdirectory(
                 title=f"Destination folder for {ext}", parent=root
@@ -361,7 +374,22 @@ class RulesDialog:
         def _add_pat_rule() -> None:
             pat = pat_var.get().strip()
             if not pat:
+                messagebox.showwarning(
+                    "Pattern required",
+                    "Enter a pattern before adding a rule.",
+                    parent=root,
+                )
                 return
+            if type_var.get() == "regex":
+                try:
+                    re.compile(pat)
+                except re.error as exc:
+                    messagebox.showerror(
+                        "Invalid regex",
+                        f"The pattern is not a valid regular expression:\n\n{exc}",
+                        parent=root,
+                    )
+                    return
             dest = filedialog.askdirectory(
                 title=f"Destination folder for '{pat}'", parent=root
             )

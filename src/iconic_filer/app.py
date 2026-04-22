@@ -748,6 +748,21 @@ class App:
                 matched,
                 scanned,
             )
+            fallback = self.config.get_setting("notification_fallback", "toast-fallback")
+            if self.config.get_setting("native_notifications", True):
+                if matched:
+                    notify(
+                        "Rescan complete",
+                        f"Found {matched} item{'s' if matched != 1 else ''} to sort "
+                        f"across {scanned} folder{'s' if scanned != 1 else ''}.",
+                        fallback_strategy=fallback,
+                    )
+                else:
+                    notify(
+                        "Rescan complete",
+                        "No new items to sort.",
+                        fallback_strategy=fallback,
+                    )
         finally:
             self._rescan_lock.release()
 
@@ -954,14 +969,27 @@ class App:
 
     def _undo_last(self) -> None:
         result = self.history.undo_last()
+        fallback = self.config.get_setting("notification_fallback", "toast-fallback")
         if not result:
             logger.info("Nothing to undo.")
+            if self.config.get_setting("native_notifications", True):
+                notify(
+                    "Nothing to undo",
+                    "No recent file moves to reverse.",
+                    fallback_strategy=fallback,
+                )
             return
 
         dst_path, src_path = result
         # Mark restored path so the watcher ignores it
         self.watcher.mark_self_moved(src_path)
         logger.info("Undone: %s -> %s", dst_path, src_path)
+        if self.config.get_setting("native_notifications", True):
+            notify(
+                "Move undone",
+                f"{os.path.basename(dst_path)} restored to {os.path.basename(os.path.dirname(src_path))}",
+                fallback_strategy=fallback,
+            )
 
         # Check whether a rename happened during the move.
         dst_basename = os.path.basename(dst_path)

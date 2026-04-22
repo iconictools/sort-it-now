@@ -52,7 +52,7 @@ def show_dashboard(
 
     # ── Pending files notice ──────────────────────────────────────────
     with lock:
-        pending = len(batch_queue)
+        pending = sum(1 for p in batch_queue if os.path.exists(p))
     if pending:
         ctk.CTkLabel(
             root,

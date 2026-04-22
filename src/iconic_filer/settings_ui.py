@@ -924,7 +924,15 @@ def _build_system_tab(
             title="Import Config", filetypes=[("Zip files", "*.zip")],
         )
         if path:
-            cfg.import_config(path)
+            try:
+                cfg.import_config(path)
+            except Exception as exc:
+                messagebox.showerror(
+                    "Import failed",
+                    f"Could not import config:\n\n{exc}",
+                    parent=root,
+                )
+                return
             messagebox.showinfo(
                 "Import", "Config imported. Restart Iconic File Filer to apply.", parent=root
             )

@@ -391,10 +391,40 @@ class Config:
                 zf.write(rules_path, "rules.json")
 
     def import_config(self, import_path: str) -> None:
-        """Import config.json and rules.json from a zip file."""
-        dest_dir = os.path.dirname(self.path) or "."
+        """Import config.json and rules.json from a zip file.
+
+        Raises
+        ------
+        zipfile.BadZipFile
+            If *import_path* is not a valid zip archive.
+        ValueError
+            If a member inside the zip contains a path traversal component or
+            the extracted JSON is not parseable.
+        OSError
+            If extraction fails due to a filesystem error.
+        """
+        dest_dir = os.path.abspath(os.path.dirname(self.path) or ".")
         with zipfile.ZipFile(import_path, "r") as zf:
+            # Guard against path-traversal entries in the zip.
+            for info in zf.infolist():
+                # Resolve where the entry would land after extraction.
+                target = os.path.realpath(os.path.join(dest_dir, info.filename))
+                if not target.startswith(dest_dir + os.sep) and target != dest_dir:
+                    raise ValueError(
+                        f"Unsafe zip entry (path traversal): {info.filename!r}"
+                    )
             for name in ("config.json", "rules.json"):
                 if name in zf.namelist():
-                    zf.extract(name, dest_dir)
+                    raw = zf.read(name)
+                    # Validate JSON before writing to disk.
+                    try:
+                        json.loads(raw)
+                    except (json.JSONDecodeError, ValueError) as exc:
+                        raise ValueError(
+                            f"Invalid JSON in {name!r}: {exc}"
+                        ) from exc
+                    target_path = os.path.join(dest_dir, name)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    with open(target_path, "wb") as fh:
+                        fh.write(raw)
         self.load()
