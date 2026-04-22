@@ -84,3 +84,41 @@ class TestHistory:
         count = hist._conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]
         assert count <= HISTORY_MAX_ACTIONS
         hist.close()
+
+    def test_undo_last_move_error_returns_none_and_keeps_pending(self, monkeypatch):
+        hist = History(self._db_path)
+        src = os.path.join(self._tmpdir, "err-source.txt")
+        dst = os.path.join(self._tmpdir, "err-dest.txt")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write("x")
+        shutil.move(src, dst)
+        action_id = hist.record(src, dst)
+
+        def _raise_move(_src, _dst):
+            raise OSError("simulated move failure")
+
+        monkeypatch.setattr(shutil, "move", _raise_move)
+        assert hist.undo_last() is None
+        assert os.path.exists(dst)
+        assert not os.path.exists(src)
+        row = hist._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        hist.close()
+
+    def test_undo_last_missing_destination_returns_none_and_keeps_pending(self):
+        hist = History(self._db_path)
+        src = os.path.join(self._tmpdir, "missing-source.txt")
+        dst = os.path.join(self._tmpdir, "missing-dest.txt")
+        action_id = hist.record(src, dst)
+        assert hist.undo_last() is None
+        assert not os.path.exists(src)
+        assert not os.path.exists(dst)
+        row = hist._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        hist.close()

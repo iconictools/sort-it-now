@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import Any, Callable
 
 import customtkinter as ctk
@@ -18,6 +18,57 @@ logger = logging.getLogger(__name__)
 
 def _font(size: int = 12, weight: str = "normal") -> ctk.CTkFont:
     return ctk.CTkFont(size=size, weight=weight)
+
+
+def pick_destination_folders(
+    source_folder: str,
+    *,
+    parent: tk.Misc | None = None,
+) -> list[str]:
+    """Interactively pick one or more destination folders."""
+    source_name = os.path.basename(source_folder) or source_folder
+    destinations: list[str] = []
+    while True:
+        if parent is not None:
+            dest = filedialog.askdirectory(
+                title=f"Choose destination for {source_name}",
+                parent=parent,
+            )
+        else:
+            dest = filedialog.askdirectory(
+                title=f"Choose destination for {source_name}",
+            )
+        if not dest:
+            break
+        dest = os.path.abspath(dest)
+        if dest in destinations:
+            if parent is not None:
+                messagebox.showinfo(
+                    "Already added",
+                    f"This destination is already selected:\n{dest}",
+                    parent=parent,
+                )
+            else:
+                messagebox.showinfo(
+                    "Already added",
+                    f"This destination is already selected:\n{dest}",
+                )
+        else:
+            destinations.append(dest)
+        if parent is not None:
+            add_more = messagebox.askyesno(
+                "Add another destination?",
+                "Do you want to add another destination folder?",
+                parent=parent,
+            )
+        else:
+            add_more = messagebox.askyesno(
+                "Add another destination?",
+                "Do you want to add another destination folder?",
+            )
+        if not add_more:
+            break
+    return destinations
 
 
 # ── SortPrompt ────────────────────────────────────────────────────────
@@ -593,6 +644,12 @@ class SetupWizard:
             font=_font(11),
             text_color=t["muted"],
         ).pack(pady=(0, 16))
+        ctk.CTkLabel(
+            root,
+            text="1) Add a watched folder   2) Pick one or more destinations   3) Finalize and run in tray",
+            font=_font(10),
+            text_color=t["muted"],
+        ).pack(pady=(0, 8))
 
         # Scrollable list of configured folders
         scroll_frame = ctk.CTkScrollableFrame(root, height=240)
@@ -644,19 +701,19 @@ class SetupWizard:
             folder = filedialog.askdirectory(title="Select folder to monitor")
             if not folder:
                 return
-            dests: list[str] = []
-            while True:
-                dest = filedialog.askdirectory(
-                    title=f"Add destination for {os.path.basename(folder)} (cancel to finish)",
-                )
-                if not dest:
-                    break
-                dests.append(dest)
+            dests = pick_destination_folders(folder, parent=root)
             if dests:
                 folders_data[folder] = dests
                 _refresh_list()
 
         def _done() -> None:
+            if not folders_data:
+                messagebox.showwarning(
+                    "Setup incomplete",
+                    "Add at least one folder to watch before finishing setup.",
+                    parent=root,
+                )
+                return
             self.result = folders_data
             root.destroy()
 
@@ -677,7 +734,7 @@ class SetupWizard:
         ).pack(side="left", padx=10)
         ctk.CTkButton(
             btn_frame,
-            text="Done ✓",
+            text="Complete setup & start in tray ✓",
             fg_color=t["btn_bg"],
             text_color=t["btn_fg"],
             hover_color=t["accent"],
@@ -687,6 +744,13 @@ class SetupWizard:
         ).pack(side="left", padx=10)
 
         root.mainloop()
+        if self.result:
+            messagebox.showinfo(
+                "You're all set",
+                "Iconic File Filer now runs in your system tray.\n\n"
+                "Use the tray icon to open Activity & Queue, Settings, and Sorting Rules.\n"
+                "When files arrive in watched folders, sorting prompts will appear.",
+            )
         return self.result
 
 

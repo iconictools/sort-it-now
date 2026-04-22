@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 import pystray
 
 logger = logging.getLogger(__name__)
+PAUSED_ICON_COLOR = "#f87171"
 
 # ── Icon drawing helpers ─────────────────────────────────────────────
 
@@ -62,6 +63,10 @@ def _icon_pending(count: int = 0) -> Image.Image:
     return _create_icon_image("#f38ba8", badge_count=count)
 
 
+def _icon_paused(count: int = 0) -> Image.Image:
+    return _create_icon_image(PAUSED_ICON_COLOR, badge_count=count)
+
+
 # ── TrayIcon wrapper ─────────────────────────────────────────────────
 
 class TrayIcon:
@@ -81,6 +86,8 @@ class TrayIcon:
         Called when the user clicks "Manage Rules".
     on_add_folder:
         Called when the user clicks "Add folder to watch...".
+    on_rescan:
+        Called when the user clicks "Rescan watched folders".
     on_quit:
         Called when the user clicks "Quit".
     """
@@ -92,7 +99,9 @@ class TrayIcon:
         on_undo: Callable[[], None] | None = None,
         on_open_settings: Callable[[], None] | None = None,
         on_open_rules: Callable[[], None] | None = None,
+        on_open_manual: Callable[[], None] | None = None,
         on_add_folder: Callable[[], None] | None = None,
+        on_rescan: Callable[[], None] | None = None,
         on_process_pending: Callable[[], None] | None = None,
         on_quit: Callable[[], None] | None = None,
     ) -> None:
@@ -101,18 +110,34 @@ class TrayIcon:
         self._on_undo = on_undo or (lambda: None)
         self._on_settings = on_open_settings or (lambda: None)
         self._on_rules = on_open_rules or (lambda: None)
+        self._on_manual = on_open_manual or (lambda: None)
         self._on_add_folder = on_add_folder or (lambda: None)
+        self._on_rescan = on_rescan or (lambda: None)
         self._on_process_pending = on_process_pending or (lambda: None)
         self._on_quit = on_quit or (lambda: None)
         self._icon: pystray.Icon | None = None
         self._pending = False
         self._pending_count = 0
-        self._focus_mode = False
+        self._prompts_paused = False
         self._monitored_count = 0
+
+    @staticmethod
+    def _action(callback: Callable[[], None]) -> Callable[..., None]:
+        """Return a pystray-compatible action callback."""
+        def _wrapped(*_args: object) -> None:
+            callback()
+        return _wrapped
 
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
-            pystray.MenuItem("Add folder to watch...", lambda: self._on_add_folder()),
+            pystray.MenuItem(
+                "Folder setup...",
+                self._action(self._on_add_folder),
+            ),
+            pystray.MenuItem(
+                "Rescan watched folders",
+                self._action(self._on_rescan),
+            ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 lambda _: (
@@ -120,21 +145,27 @@ class TrayIcon:
                     if self._pending_count > 0
                     else "Sort pending files"
                 ),
-                lambda: self._on_process_pending(),
+                self._action(self._on_process_pending),
                 visible=lambda _: self._pending,
             ),
             pystray.MenuItem(
-                "Focus mode",
-                lambda: self._on_focus(),
-                checked=lambda _: self._focus_mode,
+                lambda _: (
+                    "Pause sorting prompts"
+                    if not self._prompts_paused
+                    else "Resume sorting prompts"
+                ),
+                self._action(self._on_focus),
+                default=True,
+                checked=lambda _: self._prompts_paused,
             ),
-            pystray.MenuItem("Undo last move", lambda: self._on_undo()),
+            pystray.MenuItem("Undo last move", self._action(self._on_undo)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Dashboard", lambda: self._on_dashboard()),
-            pystray.MenuItem("Settings", lambda: self._on_settings()),
-            pystray.MenuItem("Manage Rules", lambda: self._on_rules()),
+            pystray.MenuItem("Activity & Queue", self._action(self._on_dashboard)),
+            pystray.MenuItem("Settings", self._action(self._on_settings)),
+            pystray.MenuItem("Sorting Rules...", self._action(self._on_rules)),
+            pystray.MenuItem("Manual", self._action(self._on_manual)),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit", lambda: self._quit()),
+            pystray.MenuItem("Quit", self._action(self._quit)),
         )
 
     def _quit(self) -> None:
@@ -160,14 +191,18 @@ class TrayIcon:
 
     def set_focus_mode(self, enabled: bool) -> None:
         """Update the focus-mode checkmark state in the tray menu."""
-        self._focus_mode = enabled
+        self._prompts_paused = enabled
+        if self._icon:
+            self._refresh_idle_icon()
 
     def set_pending(self, pending: bool, count: int = 0) -> None:
         """Update the icon to reflect pending items with a badge count."""
         self._pending = pending
         self._pending_count = count
         if self._icon:
-            if pending:
+            if self._prompts_paused:
+                self._apply_paused_visual(count if pending else 0)
+            elif pending:
                 self._icon.icon = _icon_pending(count)
                 self._icon.title = f"Iconic File Filer ({count} pending)"
             else:
@@ -182,12 +217,25 @@ class TrayIcon:
     def _refresh_idle_icon(self) -> None:
         """Refresh the icon and title to reflect the monitored folder count."""
         if self._icon:
+            if self._prompts_paused:
+                self._apply_paused_visual()
+                return
             self._icon.icon = _icon_idle()
             n = self._monitored_count
             if n > 0:
                 self._icon.title = f"Iconic File Filer ({n} folder{'s' if n != 1 else ''} watched)"
             else:
                 self._icon.title = "Iconic File Filer"
+
+    def _apply_paused_visual(self, queued_count: int = 0) -> None:
+        """Apply paused icon/title style, with optional queued badge count."""
+        if not self._icon:
+            return
+        self._icon.icon = _icon_paused(queued_count)
+        status = "paused"
+        if queued_count:
+            status += f", {queued_count} queued"
+        self._icon.title = f"Iconic File Filer ({status})"
 
     def stop(self) -> None:
         if self._icon:

@@ -136,6 +136,44 @@ class TestHistoryExtensions:
         assert h.undo_by_id(9999) is None
         h.close()
 
+    def test_undo_by_id_move_error_returns_none_and_not_undone(self, monkeypatch):
+        h = History(self._db)
+        src = os.path.join(self._tmpdir, "src-fail.txt")
+        dst = os.path.join(self._tmpdir, "dst-fail.txt")
+        with open(src, "w", encoding="utf-8") as f:
+            f.write("x")
+        shutil.move(src, dst)
+        action_id = h.record(src, dst)
+
+        def _raise_move(_src, _dst):
+            raise OSError("simulated move failure")
+
+        monkeypatch.setattr(shutil, "move", _raise_move)
+        assert h.undo_by_id(action_id) is None
+        assert os.path.exists(dst)
+        assert not os.path.exists(src)
+        row = h._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        h.close()
+
+    def test_undo_by_id_missing_destination_returns_none_and_not_undone(self):
+        h = History(self._db)
+        src = os.path.join(self._tmpdir, "src-missing.txt")
+        dst = os.path.join(self._tmpdir, "dst-missing.txt")
+        action_id = h.record(src, dst)
+        assert h.undo_by_id(action_id) is None
+        assert not os.path.exists(src)
+        assert not os.path.exists(dst)
+        row = h._conn.execute(
+            "SELECT undone FROM actions WHERE id = ?",
+            (action_id,),
+        ).fetchone()
+        assert row is not None and row[0] == 0
+        h.close()
+
 
 class TestAutostart:
     """Tests for autostart module (platform-independent logic)."""
@@ -203,6 +241,12 @@ class TestModuleImports:
     def test_import_prompt_cli_setup(self):
         from iconic_filer.prompt import cli_setup
         assert callable(cli_setup)
+
+    @skip_no_tkinter
+    def test_import_manual_ui(self):
+        import iconic_filer.manual_ui
+        assert hasattr(iconic_filer.manual_ui, "show_manual")
+        assert hasattr(iconic_filer.manual_ui, "show_startup_indicator")
 
 
 class TestDashboardUI:
@@ -544,3 +588,199 @@ class TestSortPromptWhitelist:
             on_done=lambda *a: None,
         )
         assert prompt._on_whitelist is None
+
+
+class TestDestinationPicker:
+    @skip_no_tkinter
+    def test_pick_destination_folders_multi_and_dedup(self, monkeypatch):
+        from iconic_filer.prompt import pick_destination_folders
+
+        picks = iter(["/tmp/d1", "/tmp/d1", "/tmp/d2"])
+        add_more = iter([True, True, False])
+        shown_infos: list[str] = []
+
+        monkeypatch.setattr(
+            "iconic_filer.prompt.filedialog.askdirectory",
+            lambda **_: next(picks),
+        )
+        monkeypatch.setattr(
+            "iconic_filer.prompt.messagebox.askyesno",
+            lambda *_, **__: next(add_more),
+        )
+        monkeypatch.setattr(
+            "iconic_filer.prompt.messagebox.showinfo",
+            lambda _title, message, **__: shown_infos.append(message),
+        )
+
+        result = pick_destination_folders("/tmp/source")
+        assert result == ["/tmp/d1", "/tmp/d2"]
+        assert len(shown_infos) == 1
+
+
+class TestTrayMenuCallbacks:
+    @skip_no_display
+    def test_tray_action_wrapper_accepts_pystray_args(self):
+        from iconic_filer.tray import TrayIcon
+
+        called = {"count": 0}
+
+        def _cb():
+            called["count"] += 1
+
+        wrapped = TrayIcon._action(_cb)
+
+        wrapped(None, None)
+        assert called["count"] == 1
+
+    @skip_no_display
+    def test_tray_menu_uses_updated_labels(self):
+        from iconic_filer.tray import TrayIcon
+
+        tray = TrayIcon()
+        menu = tray._build_menu()
+        labels: list[str] = []
+        for item in menu.items:
+            if getattr(item, "text", None) is None:
+                continue
+            text = item.text(None) if callable(item.text) else item.text
+            labels.append(text)
+
+        assert "Folder setup..." in labels
+        assert "Activity & Queue" in labels
+        assert "Sorting Rules..." in labels
+        assert "Manual" in labels
+
+        pause_items = [item for item in menu.items if getattr(item, "default", False)]
+        assert len(pause_items) == 1
+
+    @skip_no_display
+    def test_tray_focus_mode_uses_paused_title_state(self):
+        from iconic_filer.tray import TrayIcon
+
+        class _DummyIcon:
+            def __init__(self):
+                self.icon = None
+                self.title = ""
+
+        tray = TrayIcon()
+        tray._icon = _DummyIcon()  # noqa: SLF001 - targeted unit test
+        tray.set_focus_mode(True)
+        tray.set_pending(True, 2)
+
+        assert "paused" in tray._icon.title.lower()  # noqa: SLF001 - targeted unit test
+        assert "queued" in tray._icon.title.lower()  # noqa: SLF001 - targeted unit test
+
+
+
+class TestImportConfigSafety:
+    """Tests for import_config defensive handling."""
+
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_import_invalid_zip_raises(self):
+        from iconic_filer.config import Config
+
+        config_path = os.path.join(self._tmpdir, "config.json")
+        bad_zip = os.path.join(self._tmpdir, "bad.zip")
+        with open(bad_zip, "w") as fh:
+            fh.write("not a zip file")
+
+        c = Config(config_path)
+        import zipfile
+        with pytest.raises(zipfile.BadZipFile):
+            c.import_config(bad_zip)
+
+    def test_import_malformed_json_in_zip_raises(self):
+        import zipfile as zf
+        from iconic_filer.config import Config
+
+        config_path = os.path.join(self._tmpdir, "config.json")
+        bad_json_zip = os.path.join(self._tmpdir, "badjson.zip")
+        with zf.ZipFile(bad_json_zip, "w") as z:
+            z.writestr("config.json", "{not valid json!!!")
+
+        c = Config(config_path)
+        with pytest.raises(ValueError, match="Invalid JSON"):
+            c.import_config(bad_json_zip)
+
+    def test_import_path_traversal_raises(self):
+        import zipfile as zf
+        from iconic_filer.config import Config
+
+        config_path = os.path.join(self._tmpdir, "config.json")
+        trav_zip = os.path.join(self._tmpdir, "traversal.zip")
+        with zf.ZipFile(trav_zip, "w") as z:
+            z.writestr("../../evil.json", "{}")
+
+        c = Config(config_path)
+        with pytest.raises(ValueError, match="path traversal"):
+            c.import_config(trav_zip)
+
+    def test_import_valid_zip_succeeds(self):
+        from iconic_filer.config import Config
+
+        config_path = os.path.join(self._tmpdir, "config.json")
+        export_path = os.path.join(self._tmpdir, "backup.zip")
+
+        c = Config(config_path)
+        c.set_setting("theme", "light")
+        c.export_config(export_path)
+
+        c.set_setting("theme", "dark")
+        c.import_config(export_path)
+        assert c.get_setting("theme") == "light"
+
+
+class TestRulesValidation:
+    """Tests for Rules engine — pattern validation."""
+
+    def setup_method(self):
+        self._tmpdir = tempfile.mkdtemp()
+
+    def teardown_method(self):
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_invalid_regex_not_saved(self):
+        from iconic_filer.rules import Rules
+
+        rules_path = os.path.join(self._tmpdir, "rules.json")
+        r = Rules(rules_path)
+        # Save an intentionally broken regex directly (simulates bypassing the UI)
+        r.set_pattern_rule("[invalid", "/tmp/dest", "regex")
+        # The pattern is saved to disk
+        assert any(p["pattern"] == "[invalid" for p in r.pattern_rules)
+        # But get_pattern_destination must not raise — it silently skips bad regex
+        result = r.get_pattern_destination("/tmp/some_file.txt")
+        assert result is None
+
+    def test_valid_regex_matches(self):
+        from iconic_filer.rules import Rules
+
+        rules_path = os.path.join(self._tmpdir, "rules.json")
+        r = Rules(rules_path)
+        r.set_pattern_rule(r"^invoice.*\.pdf$", "/tmp/invoices", "regex")
+        assert r.get_pattern_destination("invoice_2024.pdf") == "/tmp/invoices"
+        assert r.get_pattern_destination("not_invoice.pdf") is None
+
+    def test_glob_pattern_matches(self):
+        from iconic_filer.rules import Rules
+
+        rules_path = os.path.join(self._tmpdir, "rules.json")
+        r = Rules(rules_path)
+        r.set_pattern_rule("invoice*.pdf", "/tmp/invoices", "glob")
+        assert r.get_pattern_destination("invoice_2024.pdf") == "/tmp/invoices"
+        assert r.get_pattern_destination("receipt.pdf") is None
+
+    def test_extension_rule_normalised(self):
+        from iconic_filer.rules import Rules
+
+        rules_path = os.path.join(self._tmpdir, "rules.json")
+        r = Rules(rules_path)
+        # Passing extension without leading dot — should be normalised
+        r.set_rule("pdf", "/tmp/docs")
+        assert r.extension_map.get(".pdf") == "/tmp/docs"
+

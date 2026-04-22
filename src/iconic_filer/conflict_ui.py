@@ -122,6 +122,14 @@ def resolve_conflict(
     except OSError:
         pass
 
+    ctk.CTkLabel(
+        root,
+        text="Choose how to continue: replace existing, keep both (rename), or skip this file.",
+        font=ctk.CTkFont(size=10),
+        text_color=t["muted"],
+        wraplength=420,
+    ).pack(pady=(0, 10))
+
     btn_frame = ctk.CTkFrame(root, fg_color="transparent")
     btn_frame.pack(pady=12)
 
@@ -146,7 +154,7 @@ def resolve_conflict(
 
     ctk.CTkButton(
         btn_frame,
-        text="Overwrite",
+        text="Replace existing file",
         fg_color=t["danger"],
         text_color="#ffffff",
         hover_color="#c9374a",
@@ -158,7 +166,7 @@ def resolve_conflict(
 
     ctk.CTkButton(
         btn_frame,
-        text="Rename",
+        text="Keep both (rename)",
         fg_color=t["accent"],
         text_color="#1e1e2e",
         hover_color=t["btn_active"],
@@ -170,7 +178,7 @@ def resolve_conflict(
 
     ctk.CTkButton(
         btn_frame,
-        text="Skip",
+        text="Skip this file",
         fg_color=t["btn_bg"],
         text_color=t["btn_fg"],
         hover_color=t["muted"],

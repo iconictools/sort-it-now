@@ -49,7 +49,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         # Minutes to snooze a file before re-prompting (default 30; set to 0 to disable)
         "snooze_minutes": 30,
         "batch_mode": False,
-        "batch_mode_style": "one-by-one",
+        "batch_mode_style": "batch-list",
         "prompt_delay_seconds": 3.0,
         "theme": "dark",
         # Pre-check "Always send .ext files here" in the sort prompt
@@ -80,6 +80,8 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         # When a second instance launches while one is already running,
         # how should they behave?
         "multi_instance_behavior": "prompt",
+        # Show startup welcome once after install/update.
+        "startup_welcome_seen": False,
         # Quick-Add Folder
         "quick_add_inherit_destinations": True,
         "quick_add_auto_whitelist": True,
@@ -170,12 +172,25 @@ class Config:
         """Return ``{folder_path: {per-folder settings}}`` mapping."""
         return self._data.get("monitored_folders", {})
 
+    @staticmethod
+    def _path_key(path: str) -> str:
+        """Return a normalized key for cross-platform path identity checks."""
+        return os.path.normcase(os.path.normpath(os.path.abspath(path)))
+
+    def _find_folder_key(self, folder: str) -> str | None:
+        """Return the existing stored key matching *folder*, if any."""
+        target = self._path_key(folder)
+        for key in self._data.get("monitored_folders", {}):
+            if self._path_key(key) == target:
+                return key
+        return None
+
     def add_monitored_folder(
         self, folder: str, destinations: list[str] | None = None
     ) -> None:
         """Register *folder* for monitoring with optional *destinations*."""
         folder = os.path.abspath(folder)
-        if folder not in self._data["monitored_folders"]:
+        if self._find_folder_key(folder) is None:
             self._data["monitored_folders"][folder] = {
                 **_FOLDER_DEFAULTS,
                 "destinations": destinations or [],
@@ -184,17 +199,19 @@ class Config:
 
     def remove_monitored_folder(self, folder: str) -> None:
         """Stop monitoring *folder*."""
-        folder = os.path.abspath(folder)
-        self._data["monitored_folders"].pop(folder, None)
+        key = self._find_folder_key(folder)
+        if key is not None:
+            self._data["monitored_folders"].pop(key, None)
         self.save()
 
     def set_destinations(self, folder: str, destinations: list[str]) -> None:
         """Set destination folders for a monitored *folder*."""
         folder = os.path.abspath(folder)
         mf = self._data["monitored_folders"]
-        if folder not in mf:
-            mf[folder] = {**_FOLDER_DEFAULTS}
-        mf[folder]["destinations"] = destinations
+        key = self._find_folder_key(folder) or folder
+        if key not in mf:
+            mf[key] = {**_FOLDER_DEFAULTS}
+        mf[key]["destinations"] = destinations
         self.save()
 
     # ------------------------------------------------------------------
@@ -205,9 +222,10 @@ class Config:
         """Return the per-folder settings dict, auto-creating if absent."""
         folder = os.path.abspath(folder)
         mf = self._data.setdefault("monitored_folders", {})
-        if folder not in mf:
-            mf[folder] = {**_FOLDER_DEFAULTS}
-        entry = mf[folder]
+        key = self._find_folder_key(folder) or folder
+        if key not in mf:
+            mf[key] = {**_FOLDER_DEFAULTS}
+        entry = mf[key]
         # Fill in any missing keys from defaults (forward-compat)
         for k, v in _FOLDER_DEFAULTS.items():
             if k not in entry:
@@ -373,10 +391,40 @@ class Config:
                 zf.write(rules_path, "rules.json")
 
     def import_config(self, import_path: str) -> None:
-        """Import config.json and rules.json from a zip file."""
-        dest_dir = os.path.dirname(self.path) or "."
+        """Import config.json and rules.json from a zip file.
+
+        Raises
+        ------
+        zipfile.BadZipFile
+            If *import_path* is not a valid zip archive.
+        ValueError
+            If a member inside the zip contains a path traversal component or
+            the extracted JSON is not parseable.
+        OSError
+            If extraction fails due to a filesystem error.
+        """
+        dest_dir = os.path.abspath(os.path.dirname(self.path) or ".")
         with zipfile.ZipFile(import_path, "r") as zf:
+            # Guard against path-traversal entries in the zip.
+            for info in zf.infolist():
+                # Resolve where the entry would land after extraction.
+                target = os.path.realpath(os.path.join(dest_dir, info.filename))
+                if not (target == dest_dir or target.startswith(dest_dir + os.sep)):
+                    raise ValueError(
+                        f"Unsafe zip entry (path traversal): {info.filename!r}"
+                    )
             for name in ("config.json", "rules.json"):
                 if name in zf.namelist():
-                    zf.extract(name, dest_dir)
+                    raw = zf.read(name)
+                    # Validate JSON before writing to disk.
+                    try:
+                        json.loads(raw)
+                    except (json.JSONDecodeError, ValueError) as exc:
+                        raise ValueError(
+                            f"Invalid JSON in {name!r}: {exc}"
+                        ) from exc
+                    target_path = os.path.join(dest_dir, name)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    with open(target_path, "wb") as fh:
+                        fh.write(raw)
         self.load()

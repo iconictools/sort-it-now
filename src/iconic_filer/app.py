@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import threading
+import time
 
 from iconic_filer.achievements import Achievements
 from iconic_filer.classifier import suggest_destinations
@@ -19,8 +20,9 @@ from iconic_filer.dashboard_ui import show_batch_list, show_dashboard
 from iconic_filer.duplicate import find_duplicate
 from iconic_filer.history import History
 from iconic_filer.ipc import IPCServer
+from iconic_filer.manual_ui import show_manual, show_startup_indicator, show_welcome
 from iconic_filer.notifications import notify
-from iconic_filer.prompt import SortPrompt, SetupWizard
+from iconic_filer.prompt import SortPrompt, SetupWizard, pick_destination_folders
 from iconic_filer.rules import Rules
 from iconic_filer.rules_ui import RulesDialog
 from iconic_filer.settings_ui import SettingsDialog
@@ -28,6 +30,9 @@ from iconic_filer.tray import TrayIcon
 from iconic_filer.watcher import FolderWatcher
 
 logger = logging.getLogger(__name__)
+MIN_BATCH_WINDOW_DELAY_SECONDS = 0.2
+DELETE_USER_DATA_MAX_RETRIES = 3
+DELETE_RETRY_DELAY_SECONDS = 0.2
 
 
 def _is_dnd_active() -> bool:
@@ -98,8 +103,13 @@ class App:
         self._health_notified: set[str] = set()
         # Serialise sort prompts: never show more than one at a time.
         self._prompt_semaphore = threading.Semaphore(1)
+        # Ensure only one batch-processing window is open at a time.
+        self._batch_window_open = False
+        self._batch_open_timer: threading.Timer | None = None
         # Active snooze timers so they can be cancelled on quit.
         self._snooze_timers: list[threading.Timer] = []
+        # Prevent overlapping full-folder rescans.
+        self._rescan_lock = threading.Lock()
 
         self.achievements = Achievements(
             os.path.join(os.path.dirname(self.config.path), "achievements.db")
@@ -116,7 +126,9 @@ class App:
             on_undo=self._undo_last,
             on_open_settings=self._show_settings,
             on_open_rules=self._show_rules,
-            on_add_folder=self._add_folder_via_tray,
+            on_open_manual=self._show_manual,
+            on_add_folder=self._show_folder_setup,
+            on_rescan=self._trigger_rescan,
             on_process_pending=self._process_batch_queue,
             on_quit=self._quit,
         )
@@ -128,6 +140,10 @@ class App:
 
     def run(self) -> None:
         """Start the application (blocks until quit)."""
+        show_startup_indicator(
+            theme_name=self.config.get_setting("theme", "dark"),
+            monitored_count=len(self.config.monitored_folders),
+        )
         # First-run setup if no monitored folders
         first_run = not bool(self.config.monitored_folders)
         if first_run:
@@ -138,6 +154,21 @@ class App:
                 return
             for folder, dests in folders.items():
                 self.config.add_monitored_folder(folder, dests)
+        elif not self.config.get_setting("startup_welcome_seen", False):
+            action = show_welcome(
+                theme_name=self.config.get_setting("theme", "dark"),
+                monitored_count=len(self.config.monitored_folders),
+            )
+            self.config.set_setting("startup_welcome_seen", True)
+            if action == "setup":
+                SettingsDialog(
+                    self.config,
+                    initial_tab="Folders",
+                    on_open_sorting_rules=self._show_rules,
+                    on_delete_user_data=self._delete_all_user_data,
+                ).show()
+            elif action == "manual":
+                show_manual(self.config.get_setting("theme", "dark"))
 
         # Validate monitored folders exist before starting
         missing: list[str] = []
@@ -209,17 +240,20 @@ class App:
         """
         if command.startswith("ADD_FOLDER:"):
             folder = command[len("ADD_FOLDER:"):]
-            if not folder or folder in self.config.monitored_folders:
+            if not folder:
+                return
+            folder = os.path.abspath(folder)
+            if folder in self.config.monitored_folders:
                 return
             # Find a parent folder to inherit destinations from (proper path containment)
-            folder_abs = os.path.abspath(folder)
+            monitored = list(self.config.monitored_folders)
+            monitored_abs = [(mf, os.path.abspath(mf)) for mf in monitored]
             parent_monitored = next(
                 (
-                    mf for mf in self.config.monitored_folders
-                    if folder_abs == os.path.abspath(mf)
-                    or folder_abs.startswith(os.path.abspath(mf) + os.sep)
+                    mf for mf, mf_abs in monitored_abs
+                    if folder == mf_abs or folder.startswith(mf_abs + os.sep)
                 ),
-                next(iter(self.config.monitored_folders), ""),
+                monitored[0] if monitored else "",
             )
             logger.info("IPC: adding folder %s (parent: %s)", folder, parent_monitored)
             threading.Thread(
@@ -309,7 +343,8 @@ class App:
         parent = os.path.dirname(os.path.abspath(filepath))
         for folder_cfg in self.config.monitored_folders.values():
             for dest in folder_cfg.get("destinations", []):
-                if os.path.abspath(dest) == parent:
+                dest_abs = os.path.abspath(dest)
+                if parent == dest_abs or parent.startswith(dest_abs + os.sep):
                     logger.debug(
                         "In destination folder, skipping: %s", filepath,
                     )
@@ -383,6 +418,16 @@ class App:
             filepath, destinations, merged_ext_map
         )
 
+        style = self.config.get_setting("batch_mode_style", "one-by-one")
+        if style == "batch-list":
+            with self._lock:
+                if filepath not in self._batch_queue:
+                    self._batch_queue.append(filepath)
+                count = len(self._batch_queue)
+            self.tray.set_pending(True, count)
+            self._schedule_batch_window()
+            return
+
         theme_name = self.config.get_setting("theme", "dark")
         auto_accept_secs = self.config.get_setting("prompt_auto_accept_seconds", 0)
 
@@ -410,7 +455,7 @@ class App:
             history=self.history,
             on_snooze=_on_snooze,
             on_save_destination=_on_save_destination,
-            always_rule_default=False,
+            always_rule_default=self.config.get_setting("prompt_always_rule", False),
             auto_accept_seconds=auto_accept_secs,
         )
 
@@ -604,6 +649,123 @@ class App:
                 "Added permanent destination %s for %s", dest, monitored_folder
             )
 
+    def _trigger_rescan(self) -> None:
+        """Start a one-time scan of all watched folders in a background thread."""
+        threading.Thread(target=self._rescan_watched_folders, daemon=True).start()
+
+    def _schedule_batch_window(self) -> None:
+        """Debounce and open a single batch window for detected files."""
+        with self._lock:
+            if self._focus_mode or self._stop_event.is_set() or self._batch_window_open:
+                return
+            if self._batch_open_timer is not None and self._batch_open_timer.is_alive():
+                return
+            delay = max(
+                MIN_BATCH_WINDOW_DELAY_SECONDS,
+                float(self.config.get_setting("prompt_delay_seconds", 1.0)),
+            )
+            timer = threading.Timer(delay, self._open_batch_window)
+            timer.daemon = True
+            self._batch_open_timer = timer
+            timer.start()
+
+    def _open_batch_window(self) -> None:
+        """Open the batch-processing window with currently queued files."""
+        with self._lock:
+            if self._batch_window_open or self._focus_mode:
+                return
+            queue = [path for path in self._batch_queue if os.path.exists(path)]
+            self._batch_queue.clear()
+            self._batch_open_timer = None
+            if not queue:
+                self.tray.set_pending(False)
+                return
+            self._batch_window_open = True
+            self.tray.set_pending(False)
+
+        theme_name = self.config.get_setting("theme", "dark")
+
+        def _run() -> None:
+            try:
+                show_batch_list(
+                    self.config,
+                    self.rules,
+                    self.watcher,
+                    queue,
+                    theme_name,
+                    self._move_file,
+                    on_whitelist=self.config.add_to_whitelist,
+                    on_snooze=self._on_snooze_file,
+                    on_defer=self._requeue_batch_items,
+                )
+            finally:
+                with self._lock:
+                    self._batch_window_open = False
+                    queued_count = len(self._batch_queue)
+                if queued_count:
+                    self.tray.set_pending(True, queued_count)
+                    self._schedule_batch_window()
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _requeue_batch_items(self, paths: list[str]) -> None:
+        """Re-queue files deferred from the batch-processing window."""
+        existing = [path for path in paths if os.path.exists(path)]
+        if not existing:
+            return
+        with self._lock:
+            for path in existing:
+                if path not in self._batch_queue:
+                    self._batch_queue.append(path)
+            count = len(self._batch_queue)
+        self.tray.set_pending(True, count)
+
+    def _rescan_watched_folders(self) -> None:
+        """Scan all watched folders, respecting ignore + whitelist patterns."""
+        if not self._rescan_lock.acquire(blocking=False):
+            logger.info("Rescan already running, ignoring duplicate request.")
+            return
+        try:
+            whitelist = self.config.get_whitelist()
+            monitored = list(self.config.monitored_folders)
+            if not monitored:
+                logger.info("Rescan requested with no watched folders configured.")
+                return
+            logger.info("Starting manual rescan across %d watched folder(s).", len(monitored))
+            matched = 0
+            scanned = 0
+            for folder in monitored:
+                if not os.path.isdir(folder):
+                    continue
+                scanned += 1
+                matched += self.watcher.scan_existing(
+                    folder,
+                    self._on_file_detected,
+                    whitelist,
+                )
+            logger.info(
+                "Manual rescan finished: %d candidate item(s) found across %d folder(s).",
+                matched,
+                scanned,
+            )
+            fallback = self.config.get_setting("notification_fallback", "toast-fallback")
+            if self.config.get_setting("native_notifications", True):
+                if matched:
+                    notify(
+                        "Rescan complete",
+                        f"Found {matched} item{'s' if matched != 1 else ''} to sort "
+                        f"across {scanned} folder{'s' if scanned != 1 else ''}.",
+                        fallback_strategy=fallback,
+                    )
+                else:
+                    notify(
+                        "Rescan complete",
+                        "No new items to sort.",
+                        fallback_strategy=fallback,
+                    )
+        finally:
+            self._rescan_lock.release()
+
     def _add_folder_via_tray(self) -> None:
         """Handle 'Add folder to watch...' from the tray menu.
 
@@ -642,23 +804,13 @@ class App:
             return
 
         # Pick initial destination folders for this monitored folder
-        dests: list[str] = []
         messagebox.showinfo(
             "Add destinations",
-            "Now choose one or more destination folders for files from:\n"
-            f"{folder}\n\n"
-            "You will be prompted to pick each destination. Click Cancel when done.",
+            "Choose one or more destination folders for files from:\n"
+            f"{folder}",
             parent=root,
         )
-        while True:
-            dest = filedialog.askdirectory(
-                title=f"Destination folder for {os.path.basename(folder)} (Cancel to finish)",
-                parent=root,
-            )
-            if not dest:
-                break
-            if dest not in dests:
-                dests.append(dest)
+        dests = pick_destination_folders(folder, parent=root)
 
         if not dests:
             messagebox.showwarning(
@@ -751,7 +903,7 @@ class App:
         else:
             # Open a destination picker
             import tkinter as tk
-            from tkinter import filedialog, messagebox
+            from tkinter import messagebox
 
             root = tk.Tk()
             root.withdraw()
@@ -760,19 +912,10 @@ class App:
             messagebox.showinfo(
                 "Quick Add Folder — Destinations",
                 f"Choose destination folders for:\n{folder_path}\n\n"
-                "Click Cancel when finished.",
+                "You can add multiple destinations.",
                 parent=root,
             )
-            dests = []
-            while True:
-                dest = filedialog.askdirectory(
-                    title=f"Destination for {os.path.basename(folder_path)} (Cancel to finish)",
-                    parent=root,
-                )
-                if not dest:
-                    break
-                if dest not in dests:
-                    dests.append(dest)
+            dests = pick_destination_folders(folder_path, parent=root)
             root.destroy()
 
             if not dests:
@@ -806,20 +949,47 @@ class App:
         self._focus_mode = not self._focus_mode
         self.config.set_setting("focus_mode", self._focus_mode)
         self.tray.set_focus_mode(self._focus_mode)
+        fallback = self.config.get_setting("notification_fallback", "toast-fallback")
         if not self._focus_mode:
             self._process_batch_queue()
+            if self.config.get_setting("native_notifications", True):
+                notify(
+                    "Iconic File Filer",
+                    "Sorting prompts resumed.",
+                    fallback_strategy=fallback,
+                )
+        else:
+            if self.config.get_setting("native_notifications", True):
+                notify(
+                    "Iconic File Filer",
+                    "Sorting prompts paused for all watched folders.",
+                    fallback_strategy=fallback,
+                )
         logger.info("Focus mode: %s", self._focus_mode)
 
     def _undo_last(self) -> None:
         result = self.history.undo_last()
+        fallback = self.config.get_setting("notification_fallback", "toast-fallback")
         if not result:
             logger.info("Nothing to undo.")
+            if self.config.get_setting("native_notifications", True):
+                notify(
+                    "Nothing to undo",
+                    "No recent file moves to reverse.",
+                    fallback_strategy=fallback,
+                )
             return
 
         dst_path, src_path = result
         # Mark restored path so the watcher ignores it
         self.watcher.mark_self_moved(src_path)
         logger.info("Undone: %s -> %s", dst_path, src_path)
+        if self.config.get_setting("native_notifications", True):
+            notify(
+                "Move undone",
+                f"{os.path.basename(dst_path)} restored to {os.path.basename(os.path.dirname(src_path))}",
+                fallback_strategy=fallback,
+            )
 
         # Check whether a rename happened during the move.
         dst_basename = os.path.basename(dst_path)
@@ -862,10 +1032,58 @@ class App:
     def _show_settings(self) -> None:
         """Open the settings dialog."""
         t = threading.Thread(
-            target=lambda: SettingsDialog(self.config).show(),
+            target=lambda: SettingsDialog(
+                self.config,
+                on_open_sorting_rules=self._show_rules,
+                on_rescan=self._trigger_rescan,
+                on_folder_added=self._on_settings_folder_added,
+                on_folder_removed=self._on_settings_folder_removed,
+                on_delete_user_data=self._delete_all_user_data,
+            ).show(),
             daemon=True,
         )
         t.start()
+
+    def _show_manual(self) -> None:
+        """Open the in-app manual."""
+        theme_name = self.config.get_setting("theme", "dark")
+        t = threading.Thread(
+            target=lambda: show_manual(theme_name),
+            daemon=True,
+        )
+        t.start()
+
+    def _show_folder_setup(self) -> None:
+        """Open folder setup (watched folders + destinations split view)."""
+        t = threading.Thread(
+            target=lambda: SettingsDialog(
+                self.config,
+                initial_tab="Folders",
+                on_open_sorting_rules=self._show_rules,
+                on_rescan=self._trigger_rescan,
+                on_folder_added=self._on_settings_folder_added,
+                on_folder_removed=self._on_settings_folder_removed,
+                on_delete_user_data=self._delete_all_user_data,
+            ).show(),
+            daemon=True,
+        )
+        t.start()
+
+    def _on_settings_folder_added(self, folder: str) -> None:
+        """Keep watcher and tray state in sync when Settings adds a watched folder."""
+        try:
+            self.watcher.add_folder(folder)
+        except Exception as exc:
+            logger.error("Cannot watch %s: %s", folder, exc)
+        self._update_tray_monitored_count()
+
+    def _on_settings_folder_removed(self, folder: str) -> None:
+        """Keep watcher and tray state in sync when Settings removes a watched folder."""
+        try:
+            self.watcher.remove_folder(folder)
+        except Exception as exc:
+            logger.error("Cannot stop watching %s: %s", folder, exc)
+        self._update_tray_monitored_count()
 
     def _show_rules(self) -> None:
         """Open the rule management dialog."""
@@ -876,13 +1094,13 @@ class App:
         t.start()
 
     def _show_dashboard(self) -> None:
-        """Open the enhanced dashboard window."""
+        """Open the activity window."""
         theme_name = self.config.get_setting("theme", "dark")
         t = threading.Thread(
             target=show_dashboard,
             args=(
                 self.config, self.history, self._batch_queue,
-                self._lock, self.watcher, theme_name,
+                self._lock, self.watcher, theme_name, self._trigger_rescan,
             ),
             daemon=True,
         )
@@ -898,6 +1116,9 @@ class App:
         with self._lock:
             queue = list(self._batch_queue)
             self._batch_queue.clear()
+            if self._batch_open_timer is not None and self._batch_open_timer.is_alive():
+                self._batch_open_timer.cancel()
+            self._batch_open_timer = None
         self.tray.set_pending(False)
 
         style = self.config.get_setting("batch_mode_style", "one-by-one")
@@ -907,11 +1128,47 @@ class App:
                 target=show_batch_list,
                 args=(self.config, self.rules, self.watcher, queue,
                       theme_name, self._move_file),
+                kwargs={
+                    "on_whitelist": self.config.add_to_whitelist,
+                    "on_snooze": self._on_snooze_file,
+                    "on_defer": self._requeue_batch_items,
+                },
                 daemon=True,
             ).start()
         else:
             for filepath in queue:
                 if os.path.exists(filepath):
                     self._on_file_detected(filepath)
+                else:
+                    logger.info("Skipped queued item that no longer exists: %s", filepath)
 
+    def _delete_all_user_data(self) -> None:
+        """Delete all user data from disk and terminate the running app."""
+        logger.warning("User requested delete-all-user-data operation.")
+        self._stop_event.set()
+        for timer in self._snooze_timers:
+            timer.cancel()
+        self._snooze_timers.clear()
+        self.watcher.stop()
+        self.history.close()
+        self.achievements.close()
 
+        config_dir = os.path.dirname(self.config.path)
+        if os.path.isdir(config_dir):
+            for attempt in range(1, DELETE_USER_DATA_MAX_RETRIES + 1):
+                try:
+                    shutil.rmtree(config_dir)
+                    break
+                except OSError as exc:
+                    logger.warning(
+                        "Delete-all-user-data retry %d/%d failed for %s: %s",
+                        attempt,
+                        DELETE_USER_DATA_MAX_RETRIES,
+                        config_dir,
+                        exc,
+                    )
+                    time.sleep(DELETE_RETRY_DELAY_SECONDS)
+            if os.path.isdir(config_dir):
+                logger.error("Delete-all-user-data failed; directory still exists: %s", config_dir)
+
+        self.tray.stop()

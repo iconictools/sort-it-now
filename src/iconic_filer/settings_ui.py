@@ -12,19 +12,23 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import customtkinter as ctk
 
 from iconic_filer.autostart import is_autostart_enabled, set_autostart
+from iconic_filer.prompt import pick_destination_folders
 from iconic_filer.themes import apply_ctk_appearance, get_theme
 
 if TYPE_CHECKING:
     from iconic_filer.config import Config
 
 logger = logging.getLogger(__name__)
+SETTINGS_TABS = ("General", "Monitoring", "Folders", "Rules", "System")
 
 # ── Shared button helpers ─────────────────────────────────────────────
 
@@ -92,7 +96,7 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
                                                        padx=(0, 8), pady=3)
     row += 1
 
-    _section_lbl(f, "Sort Prompt Behaviour", t).grid(row=row, column=0, columnspan=2,
+    _section_lbl(f, "Sort Prompt Behavior", t).grid(row=row, column=0, columnspan=2,
                                                       sticky="w", padx=8, pady=(12, 4))
     row += 1
     _lbl(f, 'Pre-check "Always send .ext here":', t).grid(row=row, column=0, sticky="w",
@@ -133,8 +137,8 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
                                                        padx=(0, 8), pady=3)
     row += 1
 
-    _section_lbl(f, "Undo Behaviour", t).grid(row=row, column=0, columnspan=2, sticky="w",
-                                               padx=8, pady=(12, 4))
+    _section_lbl(f, "Undo Behavior", t).grid(row=row, column=0, columnspan=2, sticky="w",
+                                                padx=8, pady=(12, 4))
     row += 1
     _lbl(f, "When undoing a renamed move:", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
     undo_name_var = tk.StringVar(value=cfg.get_setting("undo_restore_name", "ask"))
@@ -146,7 +150,7 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
     _section_lbl(f, "Multi-Instance", t).grid(row=row, column=0, columnspan=2, sticky="w",
                                                padx=8, pady=(12, 4))
     row += 1
-    _lbl(f, "Second launch behaviour:", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
+    _lbl(f, "Second launch behavior:", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
     multi_var = tk.StringVar(value=cfg.get_setting("multi_instance_behavior", "prompt"))
     ctk.CTkOptionMenu(f, variable=multi_var, values=["prompt", "always-merge", "ignore"],
                       font=ctk.CTkFont(size=10)).grid(row=row, column=1, sticky="ew",
@@ -166,7 +170,12 @@ def _build_general_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
     }
 
 
-def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> dict:
+def _build_monitoring_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    on_rescan: Callable[[], None] | None = None,
+) -> dict:
     f = tabview.tab("Monitoring")
     row = 0
 
@@ -186,6 +195,28 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
     scan_var = tk.BooleanVar(value=cfg.get_setting("scan_existing_enabled", False))
     _check(f, "Enabled", scan_var, t).grid(row=row, column=1, sticky="w", padx=(0, 8), pady=3)
     row += 1
+
+    if on_rescan is not None:
+        _lbl(f, "Run a one-time rescan now:", t).grid(
+            row=row, column=0, sticky="w", padx=8, pady=3
+        )
+        _btn(
+            f,
+            "Rescan watched folders now",
+            t,
+            on_rescan,
+            "accent",
+            width=190,
+        ).grid(row=row, column=1, sticky="w", padx=(0, 8), pady=3)
+        row += 1
+
+        _lbl(
+            f,
+            "Rescan respects ignore patterns and whitelist patterns.",
+            t,
+            size=9,
+        ).grid(row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 3))
+        row += 1
 
     _lbl(f, "Watch folders too (catch folders):", t).grid(row=row, column=0, sticky="w", padx=8, pady=3)
     catch_var = tk.BooleanVar(value=cfg.get_setting("catch_folders", False))
@@ -227,7 +258,7 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
         row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(12, 4))
     row += 1
 
-    _lbl(f, "When a file already exists at destination:", t).grid(
+    _lbl(f, "When a file already exists in a destination folder:", t).grid(
         row=row, column=0, sticky="w", padx=8, pady=3)
     conflict_var = tk.StringVar(value=cfg.get_setting("conflict_resolution", "rename"))
     ctk.CTkOptionMenu(
@@ -259,7 +290,14 @@ def _build_monitoring_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict) -> di
     }
 
 
-def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.CTk) -> dict:
+def _build_folders_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    root: ctk.CTk,
+    on_folder_added: Callable[[str], None] | None = None,
+    on_folder_removed: Callable[[str], None] | None = None,
+) -> dict:
     f = tabview.tab("Folders")
     f.grid_columnconfigure(0, weight=1)
     f.grid_columnconfigure(1, weight=1)
@@ -267,30 +305,40 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
 
     _section_lbl(f, "Watched Folders & Destinations", t).grid(
         row=0, column=0, columnspan=3, sticky="w", padx=8, pady=(10, 2))
-    _lbl(f, "Select a watched folder to manage its destinations.", t, size=9).grid(
+    _lbl(f, "Select a watched folder, then add/remove destinations on the right.", t, size=9).grid(
         row=1, column=0, columnspan=3, sticky="w", padx=8, pady=(0, 4))
 
     # Left pane: watched folders
     left = ctk.CTkFrame(f, fg_color="transparent")
     left.grid(row=2, column=0, sticky="nsew", padx=(8, 4), pady=4)
-    _lbl(left, "Watched folders:", t, size=10).pack(anchor="w")
+    _lbl(left, "Watched folders (origins):", t, size=10).pack(anchor="w")
     watch_list = _tk_listbox(left, t, height=10)
     watch_list.pack(fill="both", expand=True)
     for folder in cfg.monitored_folders:
         watch_list.insert("end", folder)
+    watch_empty = _lbl(left, "", t, size=9)
+    watch_empty.pack(anchor="w", pady=(2, 0))
     wbtn = ctk.CTkFrame(left, fg_color="transparent")
     wbtn.pack(fill="x", pady=(4, 0))
 
     # Right pane: destinations
     right = ctk.CTkFrame(f, fg_color="transparent")
     right.grid(row=2, column=1, sticky="nsew", padx=(4, 8), pady=4)
-    _lbl(right, "Destinations:", t, size=10).pack(anchor="w")
+    _lbl(right, "Destination folders:", t, size=10).pack(anchor="w")
     dest_list = _tk_listbox(right, t, height=10)
     dest_list.pack(fill="both", expand=True)
+    dest_empty = _lbl(right, "", t, size=9)
+    dest_empty.pack(anchor="w", pady=(2, 0))
     dbtn = ctk.CTkFrame(right, fg_color="transparent")
     dbtn.pack(fill="x", pady=(4, 0))
 
     _selected_folder: list[str] = []
+    watch_add_btn: ctk.CTkButton | None = None
+    watch_remove_btn: ctk.CTkButton | None = None
+    watch_open_btn: ctk.CTkButton | None = None
+    dest_add_btn: ctk.CTkButton | None = None
+    dest_remove_btn: ctk.CTkButton | None = None
+    dest_open_btn: ctk.CTkButton | None = None
 
     # Per-folder details (label + whitelist)
     sep2 = ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1)
@@ -340,6 +388,57 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
 
     _label_trace_active = False
 
+    def _refresh_empty_state() -> None:
+        if watch_list.size() == 0:
+            watch_empty.configure(
+                text="No watched folders yet. Add one to get started.",
+                text_color=t["muted"],
+            )
+        else:
+            watch_empty.configure(text="")
+        if not _selected_folder:
+            dest_empty.configure(
+                text="Select a watched folder to view destinations.",
+                text_color=t["muted"],
+            )
+        elif dest_list.size() == 0:
+            dest_empty.configure(
+                text="No destinations for this watched folder yet.",
+                text_color=t["muted"],
+            )
+        else:
+            dest_empty.configure(text="")
+
+    def _refresh_action_states() -> None:
+        has_watch = bool(watch_list.curselection())
+        has_selected_folder = bool(_selected_folder)
+        has_dest = bool(dest_list.curselection())
+        if watch_remove_btn is not None:
+            watch_remove_btn.configure(state="normal" if has_watch else "disabled")
+        if watch_open_btn is not None:
+            watch_open_btn.configure(state="normal" if has_watch else "disabled")
+        if dest_add_btn is not None:
+            dest_add_btn.configure(state="normal" if has_selected_folder else "disabled")
+        if dest_remove_btn is not None:
+            dest_remove_btn.configure(state="normal" if has_selected_folder and has_dest else "disabled")
+        if dest_open_btn is not None:
+            dest_open_btn.configure(state="normal" if has_selected_folder and has_dest else "disabled")
+
+    def _open_path(path: str) -> None:
+        if not os.path.isdir(path):
+            messagebox.showwarning("Folder not found", f"This folder is not available:\n{path}", parent=root)
+            return
+        try:
+            if sys.platform == "win32":
+                # Windows-specific function guarded by platform check.
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+        except OSError as exc:
+            messagebox.showwarning("Could not open folder", str(exc), parent=root)
+
     def _on_label_write(*_: object) -> None:
         nonlocal _label_trace_active
         if _label_trace_active and _selected_folder:
@@ -364,9 +463,13 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
     def _refresh_dests() -> None:
         dest_list.delete(0, "end")
         if not _selected_folder:
+            _refresh_empty_state()
+            _refresh_action_states()
             return
         for d in cfg.get_folder_destinations(_selected_folder[0]):
             dest_list.insert("end", d)
+        _refresh_empty_state()
+        _refresh_action_states()
 
     def _on_watch_select(_event: object = None) -> None:
         sel = watch_list.curselection()
@@ -376,19 +479,70 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
         _selected_folder.append(watch_list.get(sel[0]))
         _refresh_dests()
         _refresh_per_folder_details()
+        _refresh_action_states()
 
     watch_list.bind("<<ListboxSelect>>", _on_watch_select)
+    dest_list.bind("<<ListboxSelect>>", lambda _event: _refresh_action_states())
 
     def _add_watch() -> None:
         folder = filedialog.askdirectory(title="Choose a folder to watch")
-        if not folder or not os.path.isdir(folder):
+        if not folder:
+            return
+        if not os.path.isdir(folder):
+            messagebox.showwarning("Invalid folder", "Please choose an existing folder.", parent=root)
+            return
+        if not os.access(folder, os.R_OK | os.X_OK):
+            messagebox.showwarning(
+                "Missing permissions",
+                f"You do not have access to watch this folder:\n{folder}",
+                parent=root,
+            )
             return
         folder = os.path.abspath(folder)
         if folder in cfg.monitored_folders:
             messagebox.showinfo("Already watched", f"Already watching:\n{folder}", parent=root)
             return
-        cfg.add_monitored_folder(folder, [])
+
+        initial_dests: list[str] = []
+        if messagebox.askyesno(
+            "Add destinations now?",
+            "Would you like to add destination folders for this watched folder now?",
+            parent=root,
+        ):
+            picked = pick_destination_folders(folder, parent=root)
+            for dest in picked:
+                if dest == folder:
+                    messagebox.showwarning(
+                        "Destination matches source",
+                        "A destination cannot be the same as the watched folder.",
+                        parent=root,
+                    )
+                    continue
+                if not os.path.isdir(dest):
+                    messagebox.showwarning("Invalid destination", f"Destination does not exist:\n{dest}", parent=root)
+                    continue
+                if not os.access(dest, os.W_OK | os.X_OK):
+                    messagebox.showwarning(
+                        "Missing permissions",
+                        f"You may not be able to move files into:\n{dest}",
+                        parent=root,
+                    )
+                    continue
+                if dest not in initial_dests:
+                    initial_dests.append(dest)
+
+        cfg.add_monitored_folder(folder, initial_dests)
+        if on_folder_added is not None:
+            on_folder_added(folder)
         watch_list.insert("end", folder)
+        _refresh_empty_state()
+        _refresh_action_states()
+        dest_msg = f"Now watching:\n{folder}\n\n"
+        if initial_dests:
+            dest_msg += f"Initial destinations: {len(initial_dests)}"
+        else:
+            dest_msg += "No destinations yet (you can add them anytime)."
+        messagebox.showinfo("Watched folder added", dest_msg, parent=root)
 
     def _remove_watch() -> None:
         sel = watch_list.curselection()
@@ -397,29 +551,79 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
         folder = watch_list.get(sel[0])
         if messagebox.askyesno("Remove folder", f"Stop watching:\n{folder}?", parent=root):
             cfg.remove_monitored_folder(folder)
+            if on_folder_removed is not None:
+                on_folder_removed(folder)
             watch_list.delete(sel[0])
             _selected_folder.clear()
             dest_list.delete(0, "end")
+            _refresh_empty_state()
+            _refresh_action_states()
+            messagebox.showinfo("Watched folder removed", f"Stopped watching:\n{folder}", parent=root)
 
-    _btn(wbtn, "+ Watch", t, _add_watch, "accent", width=90).pack(side="left", padx=(0, 4))
-    _btn(wbtn, "- Remove", t, _remove_watch, "danger", width=90).pack(side="left")
+    def _open_watch() -> None:
+        sel = watch_list.curselection()
+        if not sel:
+            messagebox.showwarning("No folder selected", "Select a watched folder first.", parent=root)
+            return
+        _open_path(watch_list.get(sel[0]))
+
+    watch_add_btn = _btn(wbtn, "Add watched folder", t, _add_watch, "accent", width=140)
+    watch_add_btn.pack(side="left", padx=(0, 4))
+    watch_remove_btn = _btn(wbtn, "Remove watched folder", t, _remove_watch, "danger", width=140)
+    watch_remove_btn.pack(side="left", padx=(0, 4))
+    watch_open_btn = _btn(wbtn, "Open watched folder", t, _open_watch, "normal", width=130)
+    watch_open_btn.pack(side="left")
 
     def _add_dest() -> None:
         if not _selected_folder:
             messagebox.showwarning("No folder selected", "Select a watched folder first.", parent=root)
             return
         folder = _selected_folder[0]
-        dest = filedialog.askdirectory(title=f"Add destination for {os.path.basename(folder)}")
-        if not dest:
+        picked = pick_destination_folders(folder, parent=root)
+        if not picked:
             return
-        dest = os.path.abspath(dest)
         current = list(cfg.get_folder_destinations(folder))
-        if dest in current:
-            messagebox.showinfo("Already added", f"Already a destination:\n{dest}", parent=root)
+        added_any = False
+        added_count = 0
+        for dest in picked:
+            if not os.path.isdir(dest):
+                messagebox.showwarning("Invalid destination", f"Destination does not exist:\n{dest}", parent=root)
+                continue
+            if dest == folder:
+                messagebox.showwarning(
+                    "Destination matches source",
+                    "A destination cannot be the same as the watched folder.",
+                    parent=root,
+                )
+                continue
+            if not os.access(dest, os.W_OK | os.X_OK):
+                messagebox.showwarning(
+                    "Missing permissions",
+                    f"You may not be able to move files into:\n{dest}",
+                    parent=root,
+                )
+                continue
+            if dest in current:
+                continue
+            current.append(dest)
+            dest_list.insert("end", dest)
+            added_any = True
+            added_count += 1
+        if not added_any:
+            messagebox.showinfo(
+                "Already added",
+                "All selected folders are already destinations for this watched folder.",
+                parent=root,
+            )
             return
-        current.append(dest)
         cfg.set_destinations(folder, current)
-        dest_list.insert("end", dest)
+        _refresh_empty_state()
+        _refresh_action_states()
+        messagebox.showinfo(
+            "Destination added",
+            f"Added {added_count} destination folder(s).",
+            parent=root,
+        )
 
     def _remove_dest() -> None:
         if not _selected_folder:
@@ -429,14 +633,34 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
             return
         folder = _selected_folder[0]
         dest = dest_list.get(sel[0])
+        if not messagebox.askyesno(
+            "Remove destination",
+            f"Remove destination from this watched folder?\n{dest}",
+            parent=root,
+        ):
+            return
         current = list(cfg.get_folder_destinations(folder))
         if dest in current:
             current.remove(dest)
             cfg.set_destinations(folder, current)
         dest_list.delete(sel[0])
+        _refresh_empty_state()
+        _refresh_action_states()
+        messagebox.showinfo("Destination removed", f"Removed destination:\n{dest}", parent=root)
 
-    _btn(dbtn, "+ Add destination", t, _add_dest, "accent", width=120).pack(side="left", padx=(0, 4))
-    _btn(dbtn, "- Remove", t, _remove_dest, "danger", width=90).pack(side="left")
+    def _open_dest() -> None:
+        sel = dest_list.curselection()
+        if not sel:
+            messagebox.showwarning("No destination selected", "Select a destination first.", parent=root)
+            return
+        _open_path(dest_list.get(sel[0]))
+
+    dest_add_btn = _btn(dbtn, "Add destination", t, _add_dest, "accent", width=130)
+    dest_add_btn.pack(side="left", padx=(0, 4))
+    dest_remove_btn = _btn(dbtn, "Remove destination", t, _remove_dest, "danger", width=130)
+    dest_remove_btn.pack(side="left", padx=(0, 4))
+    dest_open_btn = _btn(dbtn, "Open destination", t, _open_dest, "normal", width=130)
+    dest_open_btn.pack(side="left")
 
     # Quick-Add options
     sep = ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1)
@@ -456,6 +680,9 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
     _check(qa_frame, "Auto-whitelist new folder name", qa_whitelist, t).pack(anchor="w", pady=2)
     _check(qa_frame, "Start watching immediately", qa_watch, t).pack(anchor="w", pady=2)
 
+    _refresh_empty_state()
+    _refresh_action_states()
+
     return {
         "quick_add_inherit_destinations": qa_inherit,
         "quick_add_auto_whitelist": qa_whitelist,
@@ -463,7 +690,13 @@ def _build_folders_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ct
     }
 
 
-def _build_rules_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.CTk) -> None:
+def _build_rules_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    root: ctk.CTk,
+    on_open_sorting_rules: Callable[[], None] | None = None,
+) -> None:
     f = tabview.tab("Rules")
 
     # Whitelist
@@ -619,8 +852,34 @@ def _build_rules_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.
     _btn(rp_btns, "- Remove", t, _rm_rp, "danger", width=80).pack(side="left", padx=(0, 4))
     _btn(rp_btns, "Enable/Disable", t, _toggle_rp, "normal", width=110).pack(side="left")
 
+    if on_open_sorting_rules is not None:
+        ctk.CTkFrame(f, fg_color=t["btn_bg"], height=1).pack(fill="x", padx=8, pady=(10, 8))
+        sorting_rules_frame = ctk.CTkFrame(f, fg_color="transparent")
+        sorting_rules_frame.pack(fill="x", padx=8, pady=(0, 4))
+        _section_lbl(sorting_rules_frame, "Sorting Rules", t).pack(anchor="w")
+        _lbl(
+            sorting_rules_frame,
+            "Open the connected sorting-rules manager (extension and pattern destinations).",
+            t,
+            size=9,
+        ).pack(anchor="w", pady=(0, 4))
+        _btn(
+            sorting_rules_frame,
+            "Open Sorting Rules Manager",
+            t,
+            on_open_sorting_rules,
+            "accent",
+            width=210,
+        ).pack(anchor="w")
 
-def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk.CTk) -> dict:
+
+def _build_system_tab(
+    tabview: ctk.CTkTabview,
+    cfg: "Config",
+    t: dict,
+    root: ctk.CTk,
+    on_delete_user_data: Callable[[], None] | None = None,
+) -> dict:
     f = tabview.tab("System")
     row = 0
 
@@ -665,13 +924,60 @@ def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk
             title="Import Config", filetypes=[("Zip files", "*.zip")],
         )
         if path:
-            cfg.import_config(path)
+            try:
+                cfg.import_config(path)
+            except Exception as exc:
+                messagebox.showerror(
+                    "Import failed",
+                    f"Could not import config:\n\n{exc}",
+                    parent=root,
+                )
+                return
             messagebox.showinfo(
                 "Import", "Config imported. Restart Iconic File Filer to apply.", parent=root
             )
 
     _btn(io_frame, "Export Config…", t, _export, "normal").pack(side="left", padx=(0, 6))
     _btn(io_frame, "Import Config…", t, _import, "normal").pack(side="left")
+
+    if on_delete_user_data is not None:
+        _section_lbl(f, "Danger Zone", t).grid(
+            row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(14, 4)
+        )
+        row += 1
+        _lbl(
+            f,
+            "Delete all user data (watched folders config, rules, history, achievements, logs).",
+            t,
+            size=9,
+        ).grid(row=row, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 3))
+        row += 1
+
+        def _delete_all_data() -> None:
+            if not messagebox.askyesno(
+                "Delete all user data?",
+                "This will permanently delete all Iconic File Filer user data.\n\nContinue?",
+                parent=root,
+            ):
+                return
+            if not messagebox.askyesno(
+                "Final confirmation",
+                "This cannot be undone. Delete all user data now and quit the app?",
+                parent=root,
+            ):
+                return
+            on_delete_user_data()
+            root.destroy()
+
+        _btn(
+            f,
+            "Delete all user data…",
+            t,
+            _delete_all_data,
+            "danger",
+            width=200,
+        ).grid(row=row, column=0, sticky="w", padx=8, pady=(0, 6))
+        row += 1
 
     f.grid_columnconfigure(1, weight=1)
     return {
@@ -685,10 +991,25 @@ def _build_system_tab(tabview: ctk.CTkTabview, cfg: "Config", t: dict, root: ctk
 class SettingsDialog:
     """Tabbed modal settings window."""
 
-    def __init__(self, config: "Config") -> None:
+    def __init__(
+        self,
+        config: "Config",
+        initial_tab: str = "General",
+        on_open_sorting_rules: Callable[[], None] | None = None,
+        on_rescan: Callable[[], None] | None = None,
+        on_folder_added: Callable[[str], None] | None = None,
+        on_folder_removed: Callable[[str], None] | None = None,
+        on_delete_user_data: Callable[[], None] | None = None,
+    ) -> None:
         self._config = config
         self._theme_name = config.get_setting("theme", "dark")
         self._theme = get_theme(self._theme_name)
+        self._initial_tab = initial_tab
+        self._on_open_sorting_rules = on_open_sorting_rules
+        self._on_rescan = on_rescan
+        self._on_folder_added = on_folder_added
+        self._on_folder_removed = on_folder_removed
+        self._on_delete_user_data = on_delete_user_data
 
     def show(self) -> None:
         """Display the settings dialog (blocks until closed)."""
@@ -716,14 +1037,40 @@ class SettingsDialog:
         tabview = ctk.CTkTabview(root, corner_radius=10)
         tabview.pack(fill="both", expand=True, padx=16, pady=(4, 4))
 
-        for tab_name in ("General", "Monitoring", "Folders", "Rules", "System"):
+        for tab_name in SETTINGS_TABS:
             tabview.add(tab_name)
 
         gen_vars = _build_general_tab(tabview, cfg, t)
-        mon_vars = _build_monitoring_tab(tabview, cfg, t)
-        folders_vars = _build_folders_tab(tabview, cfg, t, root)
-        _build_rules_tab(tabview, cfg, t, root)
-        sys_vars = _build_system_tab(tabview, cfg, t, root)
+        mon_vars = _build_monitoring_tab(
+            tabview,
+            cfg,
+            t,
+            on_rescan=self._on_rescan,
+        )
+        folders_vars = _build_folders_tab(
+            tabview,
+            cfg,
+            t,
+            root,
+            on_folder_added=self._on_folder_added,
+            on_folder_removed=self._on_folder_removed,
+        )
+        _build_rules_tab(
+            tabview,
+            cfg,
+            t,
+            root,
+            on_open_sorting_rules=self._on_open_sorting_rules,
+        )
+        sys_vars = _build_system_tab(
+            tabview,
+            cfg,
+            t,
+            root,
+            on_delete_user_data=self._on_delete_user_data,
+        )
+        if self._initial_tab in SETTINGS_TABS:
+            tabview.set(self._initial_tab)
 
         # Save / Cancel
         def _save() -> None:

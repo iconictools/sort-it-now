@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import TYPE_CHECKING, Any, Callable
 
 import customtkinter as ctk
@@ -109,7 +110,7 @@ class RulesDialog:
         apply_ctk_appearance(self._theme_name)
 
         root = ctk.CTk()
-        root.title("Iconic File Filer — Rules")
+        root.title("Iconic File Filer — Sorting Rules")
         root.resizable(True, True)
 
         w, h = 580, 680
@@ -117,6 +118,9 @@ class RulesDialog:
         sy = max(40, root.winfo_screenheight() // 2 - h // 2)
         root.geometry(f"{w}x{h}+{sx}+{sy}")
         root.minsize(480, 500)
+        root.attributes("-topmost", True)
+        root.lift()
+        root.after(300, lambda: root.attributes("-topmost", False))
 
         # ── Header ────────────────────────────────────────────────────
         header = ctk.CTkFrame(root, fg_color="transparent")
@@ -134,7 +138,7 @@ class RulesDialog:
 
         ctk.CTkLabel(
             htext,
-            text="Rules Manager",
+            text="Sorting Rules Manager",
             font=_font(16, "bold"),
             text_color=t["accent"],
             anchor="w",
@@ -170,6 +174,13 @@ class RulesDialog:
             text_color=t["muted"],
             anchor="w",
         ).pack(anchor="w", pady=(4, 8))
+        ctk.CTkLabel(
+            ext_tab,
+            text="Example: .pdf → ~/Documents/Invoices",
+            font=_font(9),
+            text_color=t["muted"],
+            anchor="w",
+        ).pack(anchor="w", pady=(0, 8))
 
         # Rule cards
         ext_scroll = ctk.CTkScrollableFrame(
@@ -239,6 +250,18 @@ class RulesDialog:
         def _add_ext_rule() -> None:
             ext = ext_var.get().strip()
             if not ext:
+                messagebox.showwarning(
+                    "Extension required",
+                    "Enter a file extension (e.g. .pdf) before adding a rule.",
+                    parent=root,
+                )
+                return
+            if not ext.startswith(".") or len(ext) < 2:
+                messagebox.showwarning(
+                    "Invalid extension",
+                    f"Extensions must start with a dot and have at least one character after it.\n\nEntered: {ext!r}",
+                    parent=root,
+                )
                 return
             dest = filedialog.askdirectory(
                 title=f"Destination folder for {ext}", parent=root
@@ -272,6 +295,13 @@ class RulesDialog:
             text_color=t["muted"],
             anchor="w",
         ).pack(anchor="w", pady=(4, 8))
+        ctk.CTkLabel(
+            pat_tab,
+            text="Regex example: ^INV-\\d{4}.*\\.pdf$",
+            font=_font(9),
+            text_color=t["muted"],
+            anchor="w",
+        ).pack(anchor="w", pady=(0, 8))
 
         pat_scroll = ctk.CTkScrollableFrame(
             pat_tab, fg_color="transparent", height=260
@@ -344,7 +374,22 @@ class RulesDialog:
         def _add_pat_rule() -> None:
             pat = pat_var.get().strip()
             if not pat:
+                messagebox.showwarning(
+                    "Pattern required",
+                    "Enter a pattern before adding a rule.",
+                    parent=root,
+                )
                 return
+            if type_var.get() == "regex":
+                try:
+                    re.compile(pat)
+                except re.error as exc:
+                    messagebox.showerror(
+                        "Invalid regex",
+                        f"The pattern is not a valid regular expression:\n\n{exc}",
+                        parent=root,
+                    )
+                    return
             dest = filedialog.askdirectory(
                 title=f"Destination folder for '{pat}'", parent=root
             )

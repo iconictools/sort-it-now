@@ -85,9 +85,15 @@ class History:
             return None
 
         action_id, src_path, dst_path = row
-        if os.path.exists(dst_path):
+        if not os.path.exists(dst_path):
+            logger.warning("Undo skipped; destination no longer exists: %s", dst_path)
+            return None
+        try:
             os.makedirs(os.path.dirname(src_path) or ".", exist_ok=True)
             shutil.move(dst_path, src_path)
+        except (OSError, shutil.Error) as exc:
+            logger.error("Undo failed for %s -> %s: %s", dst_path, src_path, exc)
+            return None
 
         self._conn.execute(
             "UPDATE actions SET undone = 1 WHERE id = ?", (action_id,)
@@ -108,9 +114,25 @@ class History:
             return None
 
         src_path, dst_path = row[0], row[1]
-        if os.path.exists(dst_path):
+        if not os.path.exists(dst_path):
+            logger.warning(
+                "Undo by id skipped; destination no longer exists: %s (id=%s)",
+                dst_path,
+                action_id,
+            )
+            return None
+        try:
             os.makedirs(os.path.dirname(src_path) or ".", exist_ok=True)
             shutil.move(dst_path, src_path)
+        except (OSError, shutil.Error) as exc:
+            logger.error(
+                "Undo by id failed for %s -> %s (id=%s): %s",
+                dst_path,
+                src_path,
+                action_id,
+                exc,
+            )
+            return None
 
         self._conn.execute(
             "UPDATE actions SET undone = 1 WHERE id = ?", (action_id,)
