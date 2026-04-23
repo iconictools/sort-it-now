@@ -87,7 +87,7 @@ class SortPrompt:
         history: Any = None,
         on_snooze: Callable[[], None] | None = None,
         on_save_destination: Callable[[str], None] | None = None,
-        always_rule_default: bool = True,
+        always_rule_default: bool = False,
         auto_accept_seconds: int = 0,
     ) -> None:
         """
