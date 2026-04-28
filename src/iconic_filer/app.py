@@ -110,6 +110,8 @@ class App:
         self._snooze_timers: list[threading.Timer] = []
         # Prevent overlapping full-folder rescans.
         self._rescan_lock = threading.Lock()
+        # Track files already prompted/queued to prevent on_modified re-triggers.
+        self._prompted: set[str] = set()
 
         self.achievements = Achievements(
             os.path.join(os.path.dirname(self.config.path), "achievements.db")
@@ -225,6 +227,7 @@ class App:
             self._ipc_server.stop()
             self.watcher.stop()
             self.history.close()
+            self.achievements.close()
 
     def _update_tray_monitored_count(self) -> None:
         """Update the tray tooltip to show how many folders are being monitored."""
@@ -243,7 +246,7 @@ class App:
             if not folder:
                 return
             folder = os.path.abspath(folder)
-            if folder in self.config.monitored_folders:
+            if self.config._find_folder_key(folder) is not None:
                 return
             # Find a parent folder to inherit destinations from (proper path containment)
             monitored = list(self.config.monitored_folders)
@@ -265,13 +268,13 @@ class App:
     def _quit(self) -> None:
         logger.info("Shutting down...")
         self._stop_event.set()
-        for timer in self._snooze_timers:
+        with self._lock:
+            timers = list(self._snooze_timers)
+            self._snooze_timers.clear()
+        for timer in timers:
             timer.cancel()
-        self._snooze_timers.clear()
         self._ipc_server.stop()
         self.watcher.stop()
-        self.history.close()
-        self.achievements.close()
 
     def _cleanup_reminder_loop(self) -> None:
         """Background daemon: notify when a monitored folder has too many files."""
@@ -428,6 +431,16 @@ class App:
             self._schedule_batch_window()
             return
 
+        # Prevent re-prompting a file that is already being shown to the user
+        # (handles on_modified re-triggers from editor auto-saves / re-downloads).
+        with self._lock:
+            if filepath in self._prompted:
+                logger.debug(
+                    "Skipping re-prompt for already-prompted path: %s", filepath
+                )
+                return
+            self._prompted.add(filepath)
+
         theme_name = self.config.get_setting("theme", "dark")
         auto_accept_secs = self.config.get_setting("prompt_auto_accept_seconds", 0)
 
@@ -470,6 +483,11 @@ class App:
         self, filepath: str, destination: str | None, always: bool
     ) -> None:
         """Callback after the user responds to a prompt."""
+        # Release the prompted guard so the file can be re-prompted if it
+        # reappears in the watched folder later.
+        with self._lock:
+            self._prompted.discard(filepath)
+
         if destination is None:
             logger.info("Ignored: %s", filepath)
             return
@@ -532,10 +550,16 @@ class App:
                         source_folder = mf
                         break
 
-            # Apply rename pattern if configured (files only, not folders)
+            # Apply rename pattern if configured (files only, not folders).
+            # Per-folder pattern takes priority over the global pattern.
             if not os.path.isdir(src):
                 _, ext = os.path.splitext(src)
-                rename_pat = self.config.get_rename_pattern(ext.lower())
+                ext_lower = ext.lower()
+                rename_pat = (
+                    self.config.get_folder_rename_pattern(source_folder, ext_lower)
+                    if source_folder
+                    else None
+                ) or self.config.get_rename_pattern(ext_lower)
                 if rename_pat:
                     new_name = _apply_rename_pattern(src, rename_pat)
                     dst = os.path.join(dest_dir, new_name)
@@ -621,6 +645,11 @@ class App:
 
     def _on_snooze_file(self, filepath: str) -> None:
         """Re-queue *filepath* for prompting after the configured snooze delay."""
+        # Release the prompted guard immediately so that when the snooze fires
+        # and _on_file_detected is called again, the file is not suppressed.
+        with self._lock:
+            self._prompted.discard(filepath)
+
         snooze = max(1, self.config.get_setting("snooze_minutes", 30))
         delay = snooze * 60
 
@@ -794,7 +823,7 @@ class App:
             return
 
         # Already monitored?
-        if folder in self.config.monitored_folders:
+        if self.config._find_folder_key(folder) is not None:
             messagebox.showinfo(
                 "Already watched",
                 f"This folder is already being monitored:\n{folder}",
@@ -889,7 +918,7 @@ class App:
           monitoring the new folder immediately.
         """
         # Already monitored?
-        if folder_path in self.config.monitored_folders:
+        if self.config._find_folder_key(folder_path) is not None:
             logger.info("Quick Add: already monitored — %s", folder_path)
             return
 
@@ -1115,6 +1144,10 @@ class App:
         - ``'batch-list'``: show a batch window
         """
         with self._lock:
+            if self._batch_window_open:
+                # A batch window is already visible; leave the queue untouched
+                # so the existing window can handle deferred items.
+                return
             queue = list(self._batch_queue)
             self._batch_queue.clear()
             if self._batch_open_timer is not None and self._batch_open_timer.is_alive():
@@ -1124,18 +1157,28 @@ class App:
 
         style = self.config.get_setting("batch_mode_style", "batch-list")
         if style == "batch-list" and queue:
+            with self._lock:
+                self._batch_window_open = True
             theme_name = self.config.get_setting("theme", "dark")
-            threading.Thread(
-                target=show_batch_list,
-                args=(self.config, self.rules, self.watcher, queue,
-                      theme_name, self._move_file),
-                kwargs={
-                    "on_whitelist": self.config.add_to_whitelist,
-                    "on_snooze": self._on_snooze_file,
-                    "on_defer": self._requeue_batch_items,
-                },
-                daemon=True,
-            ).start()
+
+            def _run() -> None:
+                try:
+                    show_batch_list(
+                        self.config, self.rules, self.watcher, queue,
+                        theme_name, self._move_file,
+                        on_whitelist=self.config.add_to_whitelist,
+                        on_snooze=self._on_snooze_file,
+                        on_defer=self._requeue_batch_items,
+                    )
+                finally:
+                    with self._lock:
+                        self._batch_window_open = False
+                        queued_count = len(self._batch_queue)
+                    if queued_count:
+                        self.tray.set_pending(True, queued_count)
+                        self._schedule_batch_window()
+
+            threading.Thread(target=_run, daemon=True).start()
         else:
             for filepath in queue:
                 if os.path.exists(filepath):
@@ -1147,12 +1190,12 @@ class App:
         """Delete all user data from disk and terminate the running app."""
         logger.warning("User requested delete-all-user-data operation.")
         self._stop_event.set()
-        for timer in self._snooze_timers:
+        with self._lock:
+            timers = list(self._snooze_timers)
+            self._snooze_timers.clear()
+        for timer in timers:
             timer.cancel()
-        self._snooze_timers.clear()
         self.watcher.stop()
-        self.history.close()
-        self.achievements.close()
 
         config_dir = os.path.dirname(self.config.path)
         if os.path.isdir(config_dir):
