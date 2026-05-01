@@ -1196,6 +1196,10 @@ class App:
         for timer in timers:
             timer.cancel()
         self.watcher.stop()
+        # Close DB connections before rmtree so file handles are released on
+        # all platforms (Windows cannot delete open files).
+        self.history.close()
+        self.achievements.close()
 
         config_dir = os.path.dirname(self.config.path)
         if os.path.isdir(config_dir):

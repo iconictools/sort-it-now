@@ -7,6 +7,7 @@ import os
 import shutil
 import sqlite3
 import time
+from typing import Optional
 
 from iconic_filer.constants import DEFAULT_HISTORY_DB, HISTORY_MAX_ACTIONS
 
@@ -29,7 +30,9 @@ class History:
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path or DEFAULT_HISTORY_DB
         os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
-        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._conn: Optional[sqlite3.Connection] = sqlite3.connect(
+            self.db_path, check_same_thread=False
+        )
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript(_SCHEMA)
         try:
@@ -234,4 +237,6 @@ class History:
         return [(r[0], r[1]) for r in rows]
 
     def close(self) -> None:
-        self._conn.close()
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
