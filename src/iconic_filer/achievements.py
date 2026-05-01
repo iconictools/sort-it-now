@@ -7,7 +7,7 @@ import os
 import sqlite3
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from iconic_filer.history import History
@@ -47,9 +47,10 @@ class Achievements:
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
-        self._conn: Optional[sqlite3.Connection] = sqlite3.connect(
+        self._conn: sqlite3.Connection = sqlite3.connect(
             db_path, check_same_thread=False
         )
+        self._closed = False
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS achievements (
@@ -156,6 +157,6 @@ class Achievements:
         return result
 
     def close(self) -> None:
-        if self._conn is not None:
+        if not self._closed:
+            self._closed = True
             self._conn.close()
-            self._conn = None
