@@ -61,16 +61,26 @@ def _pyinstaller_cmd(onefile: bool) -> list[str]:
     # invisible to it.  Collect all of pystray so every backend is available
     # inside the bundle, and add hidden imports for common Xlib helpers used
     # by the xorg backend.
+    # python-xlib is a pure-Python package; we collect the entire package so
+    # that no submodule is accidentally omitted (pystray._xorg imports
+    # Xlib.threaded, Xlib.XK, and others that are easy to miss when listing
+    # individual hidden imports).
+    # six is a pystray runtime dependency; it lives in the system Python on
+    # Ubuntu CI and may not be picked up automatically by PyInstaller.
     if system == "Linux":
         cmd.extend([
             "--collect-all=pystray",
+            "--collect-all=Xlib",
             "--hidden-import=pystray._xorg",
             "--hidden-import=pystray._appindicator",
             "--hidden-import=pystray._gtk",
             "--hidden-import=Xlib.display",
+            "--hidden-import=Xlib.threaded",
+            "--hidden-import=Xlib.XK",
             "--hidden-import=Xlib.protocol.rq",
             "--hidden-import=Xlib.ext.xtest",
             "--hidden-import=Xlib.ext.randr",
+            "--hidden-import=six",
         ])
 
     if onefile:
@@ -115,9 +125,13 @@ def _build_appimage(dist_dir: str) -> None:
             '#!/bin/bash\n'
             'HERE="$(dirname "$(readlink -f "${0}")")"\n'
             'BIN="${HERE}/usr/bin/iconic-filer"\n'
+            'LOG="${HOME}/.iconic-filer/appimage-launch.log"\n'
+            'mkdir -p "$(dirname "${LOG}")"\n'
             '\n'
-            '# On Wayland desktops DISPLAY may not be set; XWayland is almost\n'
-            '# always running so defaulting to :0 lets Tk/CTk find a display.\n'
+            '# On Wayland desktops (e.g. Bazzite/KDE, GNOME Wayland) DISPLAY\n'
+            '# may not be set.  KDE Plasma 6 starts XWayland on-demand: the\n'
+            '# moment any X11 client connects to :0 the server starts.\n'
+            '# Defaulting to :0 is safe on all common Wayland DEs.\n'
             'export DISPLAY="${DISPLAY:-:0}"\n'
             '\n'
             "# Point Python's bundled Tcl/Tk to the data dirs inside the bundle\n"
@@ -127,6 +141,20 @@ def _build_appimage(dist_dir: str) -> None:
             '\n'
             '# Keep system XDG data dirs so GTK themes / icon themes resolve.\n'
             'export XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"\n'
+            '\n'
+            '# The bundle only contains the pystray Xorg/X11 backend; skip the\n'
+            '# AppIndicator/GTK backend probes that would fail with ImportError\n'
+            '# anyway (gi.repository not bundled) and go straight to xorg.\n'
+            'export PYSTRAY_BACKEND="${PYSTRAY_BACKEND:-xorg}"\n'
+            '\n'
+            '# Log launch for easier debugging.\n'
+            '{\n'
+            '  echo "--- $(date) ---"\n'
+            '  echo "DISPLAY=${DISPLAY}"\n'
+            '  echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY}"\n'
+            '  echo "PYSTRAY_BACKEND=${PYSTRAY_BACKEND}"\n'
+            '  echo "XDG_DATA_DIRS=${XDG_DATA_DIRS}"\n'
+            '} >> "${LOG}" 2>&1\n'
             '\n'
             'exec "${BIN}/iconic-filer" "$@"\n'
         )

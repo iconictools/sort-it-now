@@ -142,10 +142,17 @@ class App:
 
     def run(self) -> None:
         """Start the application (blocks until quit)."""
-        show_startup_indicator(
-            theme_name=self.config.get_setting("theme", "dark"),
-            monitored_count=len(self.config.monitored_folders),
-        )
+        # The startup indicator requires a display connection.  On Wayland
+        # without XWayland or when DISPLAY is not accessible, CTk/Tk will
+        # raise TclError.  Skip the indicator gracefully rather than crashing
+        # before the tray error handler has a chance to run.
+        try:
+            show_startup_indicator(
+                theme_name=self.config.get_setting("theme", "dark"),
+                monitored_count=len(self.config.monitored_folders),
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("Startup indicator skipped (no display available).")
         # First-run setup if no monitored folders
         first_run = not bool(self.config.monitored_folders)
         if first_run:

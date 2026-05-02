@@ -7,7 +7,18 @@ import threading
 from typing import Callable
 
 from PIL import Image, ImageDraw, ImageFont
-import pystray
+
+# pystray connects to the X display at import time on Linux (via the xorg
+# backend's module-level Display() probe).  Guard the import so that a
+# missing display or absent Xlib/six dependency raises a *deferred* error
+# that TrayIcon.start() can surface as a visible dialog rather than an
+# unhandled crash before any UI is shown.
+_pystray_import_error: Exception | None = None
+try:
+    import pystray
+except Exception as _e:  # noqa: BLE001
+    _pystray_import_error = _e
+    pystray = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 PAUSED_ICON_COLOR = "#f87171"
@@ -182,6 +193,35 @@ class TrayIcon:
         error to the user, and re-raise so the main thread can shut down cleanly.
         """
         import sys
+
+        def _show_error(msg: str) -> None:
+            """Best-effort: show a Tk error dialog so the user sees the problem."""
+            try:
+                import tkinter as _tk
+                from tkinter import messagebox as _mb
+                _root = _tk.Tk()
+                _root.withdraw()
+                _mb.showerror("Iconic File Filer — Tray error", msg)
+                _root.destroy()
+            except Exception:
+                pass
+
+        # If pystray itself failed to import (e.g. no X display at import
+        # time, or missing Xlib/six in the bundle), surface the error now.
+        if _pystray_import_error is not None:
+            logger.error(
+                "pystray could not be imported: %s", _pystray_import_error,
+                exc_info=_pystray_import_error,
+            )
+            if sys.platform != "win32":
+                _show_error(
+                    f"pystray failed to load:\n\n{_pystray_import_error}\n\n"
+                    "On Wayland, make sure XWayland is running (DISPLAY must "
+                    "be set) and that python3-xlib is installed.\n\n"
+                    "Check ~/.iconic-filer/iconic-filer.log for details."
+                )
+            raise _pystray_import_error
+
         try:
             self._icon = pystray.Icon(
                 "iconic-filer",
@@ -194,21 +234,13 @@ class TrayIcon:
             # On Linux a missing tray backend produces a cryptic error.
             # Attempt to surface it via a Tk messagebox so the user sees it.
             if sys.platform != "win32":
-                try:
-                    import tkinter as _tk
-                    from tkinter import messagebox as _mb
-                    _root = _tk.Tk()
-                    _root.withdraw()
-                    _mb.showerror(
-                        "Iconic File Filer — Tray error",
-                        f"The system tray could not be initialised:\n\n{exc}\n\n"
-                        "On Wayland, make sure XWayland is running (DISPLAY "
-                        "must be set) and that libayatana-appindicator3 or "
-                        "python3-xlib is installed.",
-                    )
-                    _root.destroy()
-                except Exception:
-                    pass
+                _show_error(
+                    f"The system tray could not be initialised:\n\n{exc}\n\n"
+                    "On Wayland, make sure XWayland is running (DISPLAY "
+                    "must be set) and that libayatana-appindicator3 or "
+                    "python3-xlib is installed.\n\n"
+                    "Check ~/.iconic-filer/iconic-filer.log for details."
+                )
             logger.error("Tray icon failed to initialize: %s", exc, exc_info=True)
             raise
 
