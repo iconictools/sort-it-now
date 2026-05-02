@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Callable
+from typing import Callable, Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 # missing display or absent Xlib/six dependency raises a *deferred* error
 # that TrayIcon.start() can surface as a visible dialog rather than an
 # unhandled crash before any UI is shown.
-_pystray_import_error: Exception | None = None
+_pystray_import_error: Optional[Exception] = None
 try:
     import pystray
 except Exception as _e:  # noqa: BLE001

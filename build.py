@@ -59,12 +59,10 @@ def _pyinstaller_cmd(onefile: bool) -> list[str]:
     # pystray selects its backend dynamically at runtime.  PyInstaller only
     # follows static imports, so the xorg / appindicator / gtk backends are
     # invisible to it.  Collect all of pystray so every backend is available
-    # inside the bundle, and add hidden imports for common Xlib helpers used
-    # by the xorg backend.
-    # python-xlib is a pure-Python package; we collect the entire package so
-    # that no submodule is accidentally omitted (pystray._xorg imports
-    # Xlib.threaded, Xlib.XK, and others that are easy to miss when listing
-    # individual hidden imports).
+    # inside the bundle.
+    # Collect the entire python-xlib package (Xlib.*) so that no submodule is
+    # accidentally omitted — pystray's xorg backend imports Xlib.threaded,
+    # Xlib.XK, and other helpers beyond just Xlib.display.
     # six is a pystray runtime dependency; it lives in the system Python on
     # Ubuntu CI and may not be picked up automatically by PyInstaller.
     if system == "Linux":
@@ -74,12 +72,6 @@ def _pyinstaller_cmd(onefile: bool) -> list[str]:
             "--hidden-import=pystray._xorg",
             "--hidden-import=pystray._appindicator",
             "--hidden-import=pystray._gtk",
-            "--hidden-import=Xlib.display",
-            "--hidden-import=Xlib.threaded",
-            "--hidden-import=Xlib.XK",
-            "--hidden-import=Xlib.protocol.rq",
-            "--hidden-import=Xlib.ext.xtest",
-            "--hidden-import=Xlib.ext.randr",
             "--hidden-import=six",
         ])
 
