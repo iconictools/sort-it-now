@@ -174,14 +174,43 @@ class TrayIcon:
             self._icon.stop()
 
     def start(self) -> None:
-        """Create and run the tray icon (blocks the calling thread)."""
-        self._icon = pystray.Icon(
-            "iconic-filer",
-            _icon_idle(),
-            "Iconic File Filer",
-            menu=self._build_menu(),
-        )
-        self._icon.run()
+        """Create and run the tray icon (blocks the calling thread).
+
+        On Linux, pystray selects a backend (AppIndicator, GTK, or Xorg) at
+        runtime.  If none of the backends are available (missing system libs or
+        no display), it raises an exception.  We catch it here, show a visible
+        error to the user, and re-raise so the main thread can shut down cleanly.
+        """
+        import sys
+        try:
+            self._icon = pystray.Icon(
+                "iconic-filer",
+                _icon_idle(),
+                "Iconic File Filer",
+                menu=self._build_menu(),
+            )
+            self._icon.run()
+        except Exception as exc:  # noqa: BLE001
+            # On Linux a missing tray backend produces a cryptic error.
+            # Attempt to surface it via a Tk messagebox so the user sees it.
+            if sys.platform != "win32":
+                try:
+                    import tkinter as _tk
+                    from tkinter import messagebox as _mb
+                    _root = _tk.Tk()
+                    _root.withdraw()
+                    _mb.showerror(
+                        "Iconic File Filer — Tray error",
+                        f"The system tray could not be initialised:\n\n{exc}\n\n"
+                        "On Wayland, make sure XWayland is running (DISPLAY "
+                        "must be set) and that libayatana-appindicator3 or "
+                        "python3-xlib is installed.",
+                    )
+                    _root.destroy()
+                except Exception:
+                    pass
+            logger.error("Tray icon failed to initialize: %s", exc, exc_info=True)
+            raise
 
     def start_threaded(self) -> threading.Thread:
         """Start the tray icon in a background thread and return it."""

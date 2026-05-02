@@ -39,6 +39,13 @@ def _pyinstaller_cmd(onefile: bool) -> list[str]:
         f"--distpath={os.path.join(_SCRIPT_DIR, 'dist')}",
     ]
 
+    # customtkinter stores fonts/themes as package data and loads them via
+    # __file__ at runtime.  PyInstaller's default analysis misses these data
+    # files, so we must collect them explicitly on every platform.
+    cmd.extend([
+        "--collect-data=customtkinter",
+    ])
+
     # Embed platform-appropriate icon
     system = platform.system()
     if system == "Windows" and os.path.isfile(_ICON_ICO):
@@ -48,6 +55,23 @@ def _pyinstaller_cmd(onefile: bool) -> list[str]:
         cmd.append(f"--icon={_ICON_512}")
     elif system == "Linux" and os.path.isfile(_ICON_PNG):
         cmd.append(f"--icon={_ICON_PNG}")
+
+    # pystray selects its backend dynamically at runtime.  PyInstaller only
+    # follows static imports, so the xorg / appindicator / gtk backends are
+    # invisible to it.  Collect all of pystray so every backend is available
+    # inside the bundle, and add hidden imports for common Xlib helpers used
+    # by the xorg backend.
+    if system == "Linux":
+        cmd.extend([
+            "--collect-all=pystray",
+            "--hidden-import=pystray._xorg",
+            "--hidden-import=pystray._appindicator",
+            "--hidden-import=pystray._gtk",
+            "--hidden-import=Xlib.display",
+            "--hidden-import=Xlib.protocol.rq",
+            "--hidden-import=Xlib.ext.xtest",
+            "--hidden-import=Xlib.ext.randr",
+        ])
 
     if onefile:
         cmd.append("--onefile")
@@ -90,7 +114,21 @@ def _build_appimage(dist_dir: str) -> None:
         fh.write(
             '#!/bin/bash\n'
             'HERE="$(dirname "$(readlink -f "${0}")")"\n'
-            'exec "${HERE}/usr/bin/iconic-filer/iconic-filer" "$@"\n'
+            'BIN="${HERE}/usr/bin/iconic-filer"\n'
+            '\n'
+            '# On Wayland desktops DISPLAY may not be set; XWayland is almost\n'
+            '# always running so defaulting to :0 lets Tk/CTk find a display.\n'
+            'export DISPLAY="${DISPLAY:-:0}"\n'
+            '\n'
+            "# Point Python's bundled Tcl/Tk to the data dirs inside the bundle\n"
+            '# so that customtkinter and tkinter can find their assets.\n'
+            'export TCL_LIBRARY="${TCL_LIBRARY:-${BIN}/_tcl_data}"\n'
+            'export TK_LIBRARY="${TK_LIBRARY:-${BIN}/_tk_data}"\n'
+            '\n'
+            '# Keep system XDG data dirs so GTK themes / icon themes resolve.\n'
+            'export XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"\n'
+            '\n'
+            'exec "${BIN}/iconic-filer" "$@"\n'
         )
     os.chmod(apprun_path, 0o755)
 
